@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\Directory.Version.props" />
+
+  <PropertyGroup>
+    <AssemblyName>CaptureKit.Windows</AssemblyName>
+    <RootNamespace>CaptureKit.Windows</RootNamespace>
+    <PackageId>CaptureKit.Windows</PackageId>
+    <Description>Windows-native image, video, and audio capture SDK for .NET apps.</Description>
+    <Authors>Shane Weaver</Authors>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/shanebweaver/CaptureKit.git</RepositoryUrl>
+    <PackageTags>windows;capture;screenshot;screen-recording;audio;video</PackageTags>
+    <IsPackable>true</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Platforms>AnyCPU</Platforms>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="System.Drawing.Common" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaptureKit.Abstractions\CaptureKit.Abstractions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\buildTransitive\CaptureKit.Windows.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.dll" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.dll')" />
+    <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.pdb" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.pdb')" />
+    <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.dll" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.dll')" />
+    <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.pdb" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.pdb')" />
+  </ItemGroup>
+</Project>

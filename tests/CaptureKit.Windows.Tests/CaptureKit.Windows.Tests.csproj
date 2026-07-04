@@ -1,0 +1,19 @@
+<Project Sdk="MSTest.Sdk/4.0.2">
+  <PropertyGroup>
+    <UseVSTest>true</UseVSTest>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CaptureKit.Abstractions\CaptureKit.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\CaptureKit.Windows\CaptureKit.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Update="MSTest.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,28 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Folder Name="/Build/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Directory.Version.props" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="LICENSE.md" />
+    <File Path="README.md" />
+    <File Path="vcpkg.json" />
+  </Folder>
+  <Project Path="src/CaptureKit.Abstractions/CaptureKit.Abstractions.csproj" />
+  <Project Path="src/CaptureKit.Windows.Native.Core/CaptureKit.Windows.Native.Core.vcxproj" Id="8b5e7a7c-3d1f-4e9a-9c2b-1f6d8e3a5b4c" />
+  <Project Path="src/CaptureKit.Windows.Native/CaptureKit.Windows.Native.vcxproj" Id="e576bd23-e4b5-4a1e-a385-87cb932e6d32" />
+  <Project Path="src/CaptureKit.Windows/CaptureKit.Windows.csproj">
+    <Platform Solution="*|ARM64" Project="Any CPU" />
+    <Platform Solution="*|x64" Project="Any CPU" />
+  </Project>
+  <Project Path="tests/CaptureKit.Windows.Native.Tests/CaptureKit.Windows.Native.Tests.vcxproj" />
+  <Project Path="tests/CaptureKit.Windows.Tests/CaptureKit.Windows.Tests.csproj">
+    <Platform Solution="*|ARM64" Project="Any CPU" />
+    <Platform Solution="*|x64" Project="Any CPU" />
+  </Project>
+</Solution>

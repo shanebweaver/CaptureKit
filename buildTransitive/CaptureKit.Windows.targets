@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <_CaptureKitWindowsNativeRuntimeIdentifier Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' == '' and '$(RuntimeIdentifier)' == 'win-x64'">win-x64</_CaptureKitWindowsNativeRuntimeIdentifier>
+    <_CaptureKitWindowsNativeRuntimeIdentifier Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' == '' and '$(RuntimeIdentifier)' == 'win-arm64'">win-arm64</_CaptureKitWindowsNativeRuntimeIdentifier>
+    <_CaptureKitWindowsNativeRuntimeIdentifier Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' == '' and '$(Platform)' == 'x64'">win-x64</_CaptureKitWindowsNativeRuntimeIdentifier>
+    <_CaptureKitWindowsNativeRuntimeIdentifier Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">win-arm64</_CaptureKitWindowsNativeRuntimeIdentifier>
+    <_CaptureKitWindowsNativeRoot>$(MSBuildThisFileDirectory)..\runtimes\$(_CaptureKitWindowsNativeRuntimeIdentifier)\native\</_CaptureKitWindowsNativeRoot>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != '' and Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll')">
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll">
+      <Link>CaptureKit.Windows.Native.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb" Condition="Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb')">
+      <Link>CaptureKit.Windows.Native.pdb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+  </ItemGroup>
+</Project>
