@@ -1,4 +1,4 @@
-using CaptureKit;
+using CaptureKit.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CaptureKit.Windows.DependencyInjection;

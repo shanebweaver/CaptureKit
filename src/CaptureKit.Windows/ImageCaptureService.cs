@@ -1,4 +1,4 @@
-using CaptureKit;
+using CaptureKit.Abstractions;
 using System.Drawing;
 using System.Drawing.Imaging;
 

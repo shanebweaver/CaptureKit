@@ -1,4 +1,4 @@
-using CaptureKit;
+using CaptureKit.Abstractions;
 using System.Runtime.InteropServices;
 
 namespace CaptureKit.Windows;

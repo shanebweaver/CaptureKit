@@ -6,7 +6,7 @@
     <TargetPlatformMinVersion />
     <EnableWindowsTargeting>false</EnableWindowsTargeting>
     <AssemblyName>CaptureKit.Abstractions</AssemblyName>
-    <RootNamespace>CaptureKit</RootNamespace>
+    <RootNamespace>CaptureKit.Abstractions</RootNamespace>
     <PackageId>CaptureKit.Abstractions</PackageId>
     <Description>Public capture service contracts and data types for CaptureKit implementations.</Description>
     <Authors>Shane Weaver</Authors>

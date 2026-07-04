@@ -1,4 +1,4 @@
-using CaptureKit;
+using CaptureKit.Abstractions;
 using FluentAssertions;
 using System.Drawing;
 

@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace CaptureKit;
+namespace CaptureKit.Abstractions;
 
 public interface IDisplayCaptureService
 {

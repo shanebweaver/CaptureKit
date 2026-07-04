@@ -1,4 +1,4 @@
-namespace CaptureKit;
+namespace CaptureKit.Abstractions;
 
 public interface IAudioCaptureService
 {
