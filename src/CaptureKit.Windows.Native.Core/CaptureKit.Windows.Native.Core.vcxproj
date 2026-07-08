@@ -98,6 +98,7 @@
     <ClInclude Include="CallbackTypes.h" />
     <ClInclude Include="CaptureSessionConfig.h" />
     <ClInclude Include="CaptureSessionState.h" />
+    <ClInclude Include="CompositeAudioCaptureSource.h" />
     <ClInclude Include="ErrorInfo.h" />
     <ClInclude Include="FrameAdmissionController.h" />
     <ClInclude Include="FrameArrivedHandler.h" />
@@ -160,6 +161,7 @@
     <ClCompile Include="AudioCaptureDevice.cpp" />
     <ClCompile Include="AudioCaptureHandler.cpp" />
     <ClCompile Include="AudioRecorderImpl.cpp" />
+    <ClCompile Include="CompositeAudioCaptureSource.cpp" />
     <ClCompile Include="FrameArrivedHandler.cpp" />
     <ClCompile Include="IStreamConfigurationBuilder.cpp" />
     <ClCompile Include="MediaFoundationLifecycleManager.cpp" />

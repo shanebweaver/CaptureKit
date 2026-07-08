@@ -1,4 +1,5 @@
 #include "pch.h"
+#include "CompositeAudioCaptureSource.h"
 #include "WindowsAudioCaptureSessionFactory.h"
 #include <strsafe.h>
 
@@ -25,7 +26,10 @@ std::unique_ptr<WindowsAudioCaptureSession> WindowsAudioCaptureSessionFactory::C
         return nullptr;
     }
 
-    auto audioCaptureSource = m_audioCaptureSourceFactory->CreateAudioCaptureSource(mediaClock.get(), config.audioInputSourceId);
+    auto audioCaptureSource = std::make_unique<CompositeAudioCaptureSource>(
+        mediaClock.get(),
+        m_audioCaptureSourceFactory.get(),
+        config.audioInputSourceId);
     if (!audioCaptureSource)
     {
         return nullptr;

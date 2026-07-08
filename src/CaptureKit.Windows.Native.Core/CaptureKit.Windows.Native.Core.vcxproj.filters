@@ -252,6 +252,9 @@
     <ClInclude Include="WindowsWaveSinkWriterFactory.h">
       <Filter>Header Files\SinkWriter</Filter>
     </ClInclude>
+    <ClInclude Include="CompositeAudioCaptureSource.h">
+      <Filter>Header Files\AudioCapture</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -343,6 +346,9 @@
     </ClCompile>
     <ClCompile Include="WindowsWaveSinkWriterFactory.cpp">
       <Filter>Source Files\SinkWriter</Filter>
+    </ClCompile>
+    <ClCompile Include="CompositeAudioCaptureSource.cpp">
+      <Filter>Source Files\AudioCapture</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
