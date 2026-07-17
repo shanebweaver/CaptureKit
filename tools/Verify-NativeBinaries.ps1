@@ -26,6 +26,27 @@ $requiredScreenshotExports = @(
     'CombineScreenshots'
 )
 
+$requiredRecordingExports = @(
+    'StartScreenRecording',
+    'PauseScreenRecording',
+    'ResumeScreenRecording',
+    'StopScreenRecording',
+    'SetScreenRecordingAudioEnabled',
+    'SetScreenRecordingAudioInputSource',
+    'SetScreenRecordingAudioInputVolume',
+    'RegisterVideoFrameCallback',
+    'RegisterAudioSampleCallback',
+    'StartAudioRecording',
+    'PauseAudioRecording',
+    'ResumeAudioRecording',
+    'StopAudioRecording',
+    'SetAudioRecordingEnabled',
+    'SetAudioRecordingInputSource',
+    'SetAudioRecordingInputVolume',
+    'RegisterAudioRecordingSampleCallback',
+    'ConvertTextureToPixelBuffer'
+)
+
 $forbiddenScreenshotDependencies = @(
     'MFPlat.dll',
     'MFReadWrite.dll',
@@ -54,9 +75,14 @@ function Invoke-DumpBin {
 foreach ($platform in $Platforms) {
     $nativeDirectory = Join-Path $ArtifactRoot "native\$Configuration\$platform"
     $screenshotDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.Screenshot.dll'
-    $recorderDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.dll'
+    $recordingDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.Recording.dll'
+    $legacyDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.dll'
 
-    foreach ($path in @($screenshotDll, $recorderDll)) {
+    if (Test-Path -LiteralPath $legacyDll -PathType Leaf) {
+        throw "Legacy native binary '$legacyDll' is still present; recording assets must use the descriptive name."
+    }
+
+    foreach ($path in @($screenshotDll, $recordingDll)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Required native binary was not produced: '$path'."
         }
@@ -82,10 +108,16 @@ foreach ($platform in $Platforms) {
         }
     }
 
-    $recorderExports = Invoke-DumpBin -Option '/EXPORTS' -Path $recorderDll
+    $recordingExports = Invoke-DumpBin -Option '/EXPORTS' -Path $recordingDll
+    foreach ($export in $requiredRecordingExports) {
+        if ($recordingExports -notmatch "(?m)\b$([Regex]::Escape($export))\b") {
+            throw "'$recordingDll' does not export required recording function '$export'."
+        }
+    }
+
     foreach ($export in $requiredScreenshotExports) {
-        if ($recorderExports -match "(?m)\b$([Regex]::Escape($export))\b") {
-            throw "'$recorderDll' still exports '$export'; screenshot code must remain isolated from recording dependencies."
+        if ($recordingExports -match "(?m)\b$([Regex]::Escape($export))\b") {
+            throw "'$recordingDll' still exports '$export'; screenshot code must remain isolated from recording dependencies."
         }
     }
 

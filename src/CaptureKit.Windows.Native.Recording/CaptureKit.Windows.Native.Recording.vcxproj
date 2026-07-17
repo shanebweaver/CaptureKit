@@ -22,7 +22,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{e576bd23-e4b5-4a1e-a385-87cb932e6d32}</ProjectGuid>
-    <RootNamespace>CaptureKitWindowsNative</RootNamespace>
+    <RootNamespace>CaptureKitWindowsNativeRecording</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
@@ -38,7 +38,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <TargetName>CaptureKit.Windows.Native</TargetName>
+    <TargetName>CaptureKit.Windows.Native.Recording</TargetName>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <OutDir>$(SolutionDir)artifacts\native\$(Configuration)\$(Platform)\</OutDir>

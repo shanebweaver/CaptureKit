@@ -27,14 +27,18 @@ try {
             throw "'$resolvedPackage' does not contain its build-transitive native asset targets."
         }
 
+        if ($entryNames -match '(?i)^runtimes/[^/]+/native/CaptureKit\.Windows\.Native\.(dll|pdb)$') {
+            throw "'$resolvedPackage' still contains a legacy generically named native recording asset."
+        }
+
         foreach ($platform in $Platforms) {
             $runtimeIdentifier = if ($platform -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
             $destination = Join-Path $temporaryRoot "native\Release\$platform"
             $null = New-Item -ItemType Directory -Force -Path $destination
 
             foreach ($fileName in @(
-                'CaptureKit.Windows.Native.dll',
-                'CaptureKit.Windows.Native.pdb',
+                'CaptureKit.Windows.Native.Recording.dll',
+                'CaptureKit.Windows.Native.Recording.pdb',
                 'CaptureKit.Windows.Native.Screenshot.dll',
                 'CaptureKit.Windows.Native.Screenshot.pdb'
             )) {
