@@ -5,7 +5,8 @@ namespace CaptureKit.Windows;
 
 internal static partial class NativeInterop
 {
-    private const string NativeLibraryName = "CaptureKit.Windows.Native.dll";
+    internal const string NativeLibraryName = "CaptureKit.Windows.Native.dll";
+    internal const string ScreenshotNativeLibraryName = "CaptureKit.Windows.Native.Screenshot.dll";
 
     [DllImport(NativeLibraryName)]
     internal static extern CaptureRecorderResult StartScreenRecording(in NativeVideoCaptureOptions options);
@@ -58,13 +59,13 @@ internal static partial class NativeInterop
     [DllImport(NativeLibraryName)]
     internal static extern CaptureRecorderResult RegisterAudioRecordingSampleCallback(AudioSampleCallback? callback);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     internal static extern nint CaptureMonitorScreenshot(nint monitorHandle);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     internal static extern nint CaptureAllMonitorsScreenshot();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     internal static extern void GetScreenshotInfo(
         nint handle,
         out int width,
@@ -75,23 +76,23 @@ internal static partial class NativeInterop
         out uint dpiY,
         [MarshalAs(UnmanagedType.I1)] out bool isPrimary);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool CopyScreenshotPixels(
         nint handle,
         byte[] buffer,
         int bufferSize);
 
-    [DllImport(NativeLibraryName, CharSet = CharSet.Unicode)]
+    [DllImport(ScreenshotNativeLibraryName, CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool SaveScreenshotToPng(
         nint handle,
         string filePath);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     internal static extern void FreeScreenshot(nint handle);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(ScreenshotNativeLibraryName)]
     internal static extern nint CombineScreenshots(
         nint[] handles,
         int count);

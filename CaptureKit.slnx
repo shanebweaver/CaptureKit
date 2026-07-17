@@ -15,6 +15,7 @@
   </Folder>
   <Project Path="src/CaptureKit.Abstractions/CaptureKit.Abstractions.csproj" />
   <Project Path="src/CaptureKit.Windows.Native.Core/CaptureKit.Windows.Native.Core.vcxproj" Id="8b5e7a7c-3d1f-4e9a-9c2b-1f6d8e3a5b4c" />
+  <Project Path="src/CaptureKit.Windows.Native.Screenshot/CaptureKit.Windows.Native.Screenshot.vcxproj" Id="bf052c13-4c3d-4ca8-96b7-046f4d1d04e1" />
   <Project Path="src/CaptureKit.Windows.Native/CaptureKit.Windows.Native.vcxproj" Id="e576bd23-e4b5-4a1e-a385-87cb932e6d32" />
   <Project Path="src/CaptureKit.Windows/CaptureKit.Windows.csproj" />
   <Project Path="tests/CaptureKit.Windows.Native.Tests/CaptureKit.Windows.Native.Tests.vcxproj" Id="439dc4fa-fb32-9479-597e-630984c30edd" />

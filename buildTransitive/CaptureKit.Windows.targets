@@ -7,7 +7,14 @@
     <_CaptureKitWindowsNativeRoot>$(MSBuildThisFileDirectory)..\runtimes\$(_CaptureKitWindowsNativeRuntimeIdentifier)\native\</_CaptureKitWindowsNativeRoot>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != '' and Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll')">
+  <Target Name="ValidateCaptureKitWindowsNativeAssets" BeforeTargets="PrepareForBuild" Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != ''">
+    <Error Condition="!Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll')"
+           Text="CaptureKit.Windows is missing CaptureKit.Windows.Native.dll for $(_CaptureKitWindowsNativeRuntimeIdentifier)." />
+    <Error Condition="!Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Screenshot.dll')"
+           Text="CaptureKit.Windows is missing CaptureKit.Windows.Native.Screenshot.dll for $(_CaptureKitWindowsNativeRuntimeIdentifier)." />
+  </Target>
+
+  <ItemGroup Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != ''">
     <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll">
       <Link>CaptureKit.Windows.Native.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -15,6 +22,16 @@
     </Content>
     <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb" Condition="Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb')">
       <Link>CaptureKit.Windows.Native.pdb</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Screenshot.dll">
+      <Link>CaptureKit.Windows.Native.Screenshot.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Screenshot.pdb" Condition="Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Screenshot.pdb')">
+      <Link>CaptureKit.Windows.Native.Screenshot.pdb</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </Content>

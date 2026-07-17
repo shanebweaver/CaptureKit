@@ -32,7 +32,11 @@
     <None Include="..\..\buildTransitive\CaptureKit.Windows.targets" Pack="true" PackagePath="buildTransitive\" />
     <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.dll" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.dll')" />
     <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.pdb" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.pdb')" />
+    <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.Screenshot.dll" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.Screenshot.dll')" />
+    <None Include="..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.Screenshot.pdb" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\x64\CaptureKit.Windows.Native.Screenshot.pdb')" />
     <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.dll" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.dll')" />
     <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.pdb" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.pdb')" />
+    <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.Screenshot.dll" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.Screenshot.dll')" />
+    <None Include="..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.Screenshot.pdb" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" Condition="Exists('..\..\artifacts\native\Release\ARM64\CaptureKit.Windows.Native.Screenshot.pdb')" />
   </ItemGroup>
 </Project>

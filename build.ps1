@@ -109,6 +109,26 @@ function Resolve-VSTestPath {
     return $null
 }
 
+function Resolve-DumpBinPath {
+    param(
+        [string]$MSBuild
+    )
+
+    $msbuildDirectory = Split-Path -Path $MSBuild -Parent
+    $vsRoot = Split-Path -Path (Split-Path -Path (Split-Path -Path $msbuildDirectory -Parent) -Parent) -Parent
+    $vcToolsRoot = Join-Path $vsRoot 'VC\Tools\MSVC'
+    $candidate = Get-ChildItem -LiteralPath $vcToolsRoot -Recurse -File -Filter 'dumpbin.exe' |
+        Where-Object { $_.FullName.EndsWith('\bin\Hostx64\x64\dumpbin.exe', [StringComparison]::OrdinalIgnoreCase) } |
+        Sort-Object -Property FullName -Descending |
+        Select-Object -First 1
+
+    if ($candidate) {
+        return $candidate.FullName
+    }
+
+    throw 'Could not find the x64-hosted dumpbin.exe required for native binary verification.'
+}
+
 $repoRoot = $PSScriptRoot
 $msbuild = Resolve-MSBuildPath -ExplicitPath $MSBuildPath
 $packageOutput = Join-Path $repoRoot 'artifacts\packages'
@@ -154,15 +174,39 @@ if ((Test-Path -LiteralPath $vcpkgBootstrap -PathType Leaf) -and -not (Test-Path
 
 if (-not $SkipNative) {
     foreach ($platform in $Platforms) {
-        Invoke-Process -FilePath $msbuild -Arguments @(
-            (Join-Path $repoRoot 'src\CaptureKit.Windows.Native\CaptureKit.Windows.Native.vcxproj'),
-            '/restore',
-            '/m',
-            '/nologo',
-            "/v:$Verbosity",
-            "/p:Configuration=$Configuration",
-            "/p:Platform=$platform",
-            $solutionDirProperty
+        foreach ($nativeProject in @(
+            'src\CaptureKit.Windows.Native\CaptureKit.Windows.Native.vcxproj',
+            'src\CaptureKit.Windows.Native.Screenshot\CaptureKit.Windows.Native.Screenshot.vcxproj'
+        )) {
+            Invoke-Process -FilePath $msbuild -Arguments @(
+                (Join-Path $repoRoot $nativeProject),
+                '/restore',
+                '/m',
+                '/nologo',
+                "/v:$Verbosity",
+                "/p:Configuration=$Configuration",
+                "/p:Platform=$platform",
+                $solutionDirProperty
+            )
+        }
+    }
+
+    $dumpBin = Resolve-DumpBinPath -MSBuild $msbuild
+    foreach ($platform in $Platforms) {
+        Invoke-Process -FilePath 'powershell' -Arguments @(
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            (Join-Path $repoRoot 'tools\Verify-NativeBinaries.ps1'),
+            '-DumpBinPath',
+            $dumpBin,
+            '-ArtifactRoot',
+            (Join-Path $repoRoot 'artifacts'),
+            '-Configuration',
+            $Configuration,
+            '-Platforms',
+            $platform
         )
     }
 }
@@ -244,4 +288,29 @@ if (-not $SkipPack) {
         '-o',
         $packageOutput
     )
+
+    if (-not $SkipNative) {
+        $captureKitPackage = Get-ChildItem -LiteralPath $packageOutput -File -Filter "CaptureKit.Windows.*$VersionBuild.nupkg" |
+            Sort-Object -Property LastWriteTimeUtc -Descending |
+            Select-Object -First 1
+        if (-not $captureKitPackage) {
+            throw "Could not find the CaptureKit.Windows package for version suffix '$VersionBuild'."
+        }
+
+        foreach ($platform in $Platforms) {
+            Invoke-Process -FilePath 'powershell' -Arguments @(
+                '-NoProfile',
+                '-ExecutionPolicy',
+                'Bypass',
+                '-File',
+                (Join-Path $repoRoot 'tools\Verify-NuGetPackage.ps1'),
+                '-PackagePath',
+                $captureKitPackage.FullName,
+                '-DumpBinPath',
+                $dumpBin,
+                '-Platforms',
+                $platform
+            )
+        }
+    }
 }

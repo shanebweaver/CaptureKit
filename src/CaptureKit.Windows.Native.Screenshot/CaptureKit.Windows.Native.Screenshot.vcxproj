@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{e576bd23-e4b5-4a1e-a385-87cb932e6d32}</ProjectGuid>
-    <RootNamespace>CaptureKitWindowsNative</RootNamespace>
+    <ProjectGuid>{BF052C13-4C3D-4CA8-96B7-046F4D1D04E1}</ProjectGuid>
+    <RootNamespace>CaptureKitWindowsNativeScreenshot</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
@@ -38,7 +38,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
-    <TargetName>CaptureKit.Windows.Native</TargetName>
+    <TargetName>CaptureKit.Windows.Native.Screenshot</TargetName>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <OutDir>$(SolutionDir)artifacts\native\$(Configuration)\$(Platform)\</OutDir>
@@ -56,7 +56,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup>
-    <IncludePath>$(SolutionDir)src\CaptureKit.Windows.Native.Core;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\CaptureKit.Windows.Native;$(SolutionDir)src\CaptureKit.Windows.Native.Core;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -66,47 +66,35 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>Default</LanguageStandard_C>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>
-        mfplat.lib;mfreadwrite.lib;mfuuid.lib;d3d11.lib;dxgi.lib;windowsapp.lib;runtimeobject.lib;psapi.lib;%(AdditionalDependencies)
-      </AdditionalDependencies>
+      <AdditionalDependencies>Shcore.lib;Windowscodecs.lib;Gdi32.lib;Ole32.lib;windowsapp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
-      <PreprocessorDefinitions>
-        _DEBUG;CAPTUREINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)
-      </PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;CAPTUREINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>
-        NDEBUG;CAPTUREINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)
-      </PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;CAPTUREINTEROP_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AudioRecorder.h" />
-    <ClInclude Include="ScreenRecorder.h" />
-    <ClInclude Include="TextureConversionExports.h" />
+    <ClInclude Include="..\CaptureKit.Windows.Native\ScreenshotExports.h" />
+    <ClInclude Include="..\CaptureKit.Windows.Native.Core\WindowsScreenshotCapture.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AudioRecorder.cpp" />
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="ScreenRecorder.cpp" />
-    <ClCompile Include="TextureConversionExports.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\CaptureKit.Windows.Native.Core\CaptureKit.Windows.Native.Core.vcxproj">
-      <Project>{8B5E7A7C-3D1F-4E9A-9C2B-1F6D8E3A5B4C}</Project>
-    </ProjectReference>
+    <ClCompile Include="..\CaptureKit.Windows.Native\ScreenshotExports.cpp" />
+    <ClCompile Include="..\CaptureKit.Windows.Native.Core\WindowsScreenshotCapture.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets" Condition="Exists('$(VcpkgRoot)\scripts\buildsystems\msbuild\vcpkg.targets')" />

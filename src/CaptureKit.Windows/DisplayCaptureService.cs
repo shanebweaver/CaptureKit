@@ -9,6 +9,10 @@ public sealed class DisplayCaptureService : IDisplayCaptureService
 {
     public IReadOnlyList<DisplayCapture> CaptureDisplays()
     {
+        // Resolve and validate native code before entering the reverse P/Invoke callback.
+        // Exceptions crossing EnumDisplayMonitors can terminate NativeAOT applications.
+        NativeScreenshotLibrary.EnsureAvailable();
+
         var results = new List<DisplayCapture>();
 
         _ = EnumDisplayMonitors(
