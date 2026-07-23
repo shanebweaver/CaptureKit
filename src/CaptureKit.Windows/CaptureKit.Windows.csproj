@@ -27,6 +27,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CaptureKit.Windows.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\buildTransitive\CaptureKit.Windows.targets" Pack="true" PackagePath="buildTransitive\" />

@@ -11,8 +11,6 @@ param(
     [switch]$SkipManagedTests,
     [switch]$SkipPack,
 
-    [string]$VersionBuild,
-
     [ValidateSet('quiet', 'minimal', 'normal', 'detailed', 'diagnostic')]
     [string]$Verbosity = 'minimal',
 
@@ -134,37 +132,8 @@ $msbuild = Resolve-MSBuildPath -ExplicitPath $MSBuildPath
 $packageOutput = Join-Path $repoRoot 'artifacts\packages'
 $solutionDirProperty = "/p:SolutionDir=$repoRoot\"
 
-if ([string]::IsNullOrWhiteSpace($VersionBuild)) {
-    if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_RUN_NUMBER)) {
-        $VersionBuild = "ci$($env:GITHUB_RUN_NUMBER)"
-    }
-    elseif (-not [string]::IsNullOrWhiteSpace($env:BUILD_BUILDID)) {
-        $VersionBuild = "ci$($env:BUILD_BUILDID)"
-    }
-    else {
-        $VersionBuild = "local.$([DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))"
-    }
-}
-
-$normalizedVersionBuild = $VersionBuild -replace '[^0-9A-Za-z.-]+', '.'
-$versionBuildParts = @($normalizedVersionBuild -split '\.' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-$versionBuildParts = @($versionBuildParts | ForEach-Object {
-    if ($_ -match '^0[0-9]+$') {
-        "b$_"
-    }
-    else {
-        $_
-    }
-})
-$VersionBuild = $versionBuildParts -join '.'
-if ([string]::IsNullOrWhiteSpace($VersionBuild)) {
-    throw 'Could not determine a valid version build suffix.'
-}
-
-$versionBuildProperty = "/p:versionBuild=$VersionBuild"
-
 Write-Host "Using MSBuild: $msbuild"
-Write-Host "Using version build suffix: $VersionBuild"
+Write-Host 'Using stable package version from Directory.Version.props.'
 
 $vcpkgBootstrap = Join-Path $repoRoot 'vcpkg\bootstrap-vcpkg.bat'
 $vcpkgExe = Join-Path $repoRoot 'vcpkg\vcpkg.exe'
@@ -215,16 +184,14 @@ Invoke-Process -FilePath 'dotnet' -Arguments @(
     'build',
     (Join-Path $repoRoot 'src\CaptureKit.Abstractions\CaptureKit.Abstractions.csproj'),
     '-c',
-    $Configuration,
-    $versionBuildProperty
+    $Configuration
 )
 
 Invoke-Process -FilePath 'dotnet' -Arguments @(
     'build',
     (Join-Path $repoRoot 'src\CaptureKit.Windows\CaptureKit.Windows.csproj'),
     '-c',
-    $Configuration,
-    $versionBuildProperty
+    $Configuration
 )
 
 if (-not $SkipNativeTests -and -not $SkipNative -and $Platforms -contains 'x64') {
@@ -260,8 +227,7 @@ if (-not $SkipManagedTests) {
         'test',
         (Join-Path $repoRoot 'tests\CaptureKit.Windows.Tests\CaptureKit.Windows.Tests.csproj'),
         '-c',
-        $Configuration,
-        $versionBuildProperty
+        $Configuration
     )
 }
 
@@ -273,7 +239,6 @@ if (-not $SkipPack) {
         '-c',
         $Configuration,
         '--no-build',
-        $versionBuildProperty,
         '-o',
         $packageOutput
     )
@@ -284,17 +249,17 @@ if (-not $SkipPack) {
         '-c',
         $Configuration,
         '--no-build',
-        $versionBuildProperty,
         '-o',
         $packageOutput
     )
 
     if (-not $SkipNative) {
-        $captureKitPackage = Get-ChildItem -LiteralPath $packageOutput -File -Filter "CaptureKit.Windows.*$VersionBuild.nupkg" |
+        $packageFilePattern = 'CaptureKit.Windows.1.0.0.nupkg'
+        $captureKitPackage = Get-ChildItem -LiteralPath $packageOutput -File -Filter $packageFilePattern |
             Sort-Object -Property LastWriteTimeUtc -Descending |
             Select-Object -First 1
         if (-not $captureKitPackage) {
-            throw "Could not find the CaptureKit.Windows package for version suffix '$VersionBuild'."
+            throw "Could not find the CaptureKit.Windows package matching '$packageFilePattern'."
         }
 
         foreach ($platform in $Platforms) {

@@ -20,8 +20,31 @@ internal static class NativeScreenshotLibrary
         LoadAndValidate,
         LazyThreadSafetyMode.ExecutionAndPublication);
 
+    static NativeScreenshotLibrary()
+    {
+        NativeLibrary.SetDllImportResolver(
+            typeof(NativeScreenshotLibrary).Assembly,
+            ResolveImport);
+    }
+
     internal static void EnsureAvailable()
         => _ = LibraryHandle.Value;
+
+    private static nint ResolveImport(
+        string libraryName,
+        Assembly assembly,
+        DllImportSearchPath? searchPath)
+    {
+        _ = assembly;
+        _ = searchPath;
+
+        return string.Equals(
+            libraryName,
+            NativeInterop.ScreenshotNativeLibraryName,
+            StringComparison.OrdinalIgnoreCase)
+                ? LibraryHandle.Value
+                : nint.Zero;
+    }
 
     private static nint LoadAndValidate()
     {

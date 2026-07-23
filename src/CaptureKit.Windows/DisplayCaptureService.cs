@@ -9,78 +9,81 @@ public sealed class DisplayCaptureService : IDisplayCaptureService
 {
     public IReadOnlyList<DisplayCapture> CaptureDisplays()
     {
-        // Resolve and validate native code before entering the reverse P/Invoke callback.
-        // Exceptions crossing EnumDisplayMonitors can terminate NativeAOT applications.
+        // Bind the screenshot P/Invokes before entering the reverse P/Invoke callback.
         NativeScreenshotLibrary.EnsureAvailable();
 
-        var results = new List<DisplayCapture>();
-
+        var monitorHandles = new List<nint>();
         _ = EnumDisplayMonitors(
             nint.Zero,
             nint.Zero,
             (monitorHandle, _, _, _) =>
             {
-                nint screenshotHandle = NativeInterop.CaptureMonitorScreenshot(monitorHandle);
-                if (screenshotHandle == nint.Zero)
-                {
-                    return true;
-                }
-
-                try
-                {
-                    NativeInterop.GetScreenshotInfo(
-                        screenshotHandle,
-                        out int width,
-                        out int height,
-                        out int left,
-                        out int top,
-                        out uint dpiX,
-                        out uint dpiY,
-                        out bool isPrimary);
-
-                    long totalBytes = (long)width * height * 4;
-                    if (totalBytes <= 0 || totalBytes > int.MaxValue)
-                    {
-                        return true;
-                    }
-
-                    var pixels = new byte[(int)totalBytes];
-                    if (!NativeInterop.CopyScreenshotPixels(screenshotHandle, pixels, pixels.Length))
-                    {
-                        return true;
-                    }
-
-                    var monitorInfo = new MonitorInfoEx
-                    {
-                        Size = Marshal.SizeOf<MonitorInfoEx>(),
-                        DeviceName = string.Empty
-                    };
-
-                    if (!GetMonitorInfo(monitorHandle, ref monitorInfo))
-                    {
-                        return true;
-                    }
-
-                    int workWidth = monitorInfo.WorkArea.Right - monitorInfo.WorkArea.Left;
-                    int workHeight = monitorInfo.WorkArea.Bottom - monitorInfo.WorkArea.Top;
-
-                    results.Add(new DisplayCapture(
-                        monitorHandle,
-                        pixels,
-                        dpiX,
-                        dpiY,
-                        new Rectangle(left, top, width, height),
-                        new Rectangle(monitorInfo.WorkArea.Left, monitorInfo.WorkArea.Top, workWidth, workHeight),
-                        isPrimary));
-                }
-                finally
-                {
-                    NativeInterop.FreeScreenshot(screenshotHandle);
-                }
-
+                monitorHandles.Add(monitorHandle);
                 return true;
             },
             nint.Zero);
+
+        var results = new List<DisplayCapture>();
+        foreach (nint monitorHandle in monitorHandles)
+        {
+            nint screenshotHandle = NativeInterop.CaptureMonitorScreenshot(monitorHandle);
+            if (screenshotHandle == nint.Zero)
+            {
+                continue;
+            }
+
+            try
+            {
+                NativeInterop.GetScreenshotInfo(
+                    screenshotHandle,
+                    out int width,
+                    out int height,
+                    out int left,
+                    out int top,
+                    out uint dpiX,
+                    out uint dpiY,
+                    out bool isPrimary);
+
+                long totalBytes = (long)width * height * 4;
+                if (totalBytes <= 0 || totalBytes > int.MaxValue)
+                {
+                    continue;
+                }
+
+                var pixels = new byte[(int)totalBytes];
+                if (!NativeInterop.CopyScreenshotPixels(screenshotHandle, pixels, pixels.Length))
+                {
+                    continue;
+                }
+
+                var monitorInfo = new MonitorInfoEx
+                {
+                    Size = Marshal.SizeOf<MonitorInfoEx>(),
+                    DeviceName = string.Empty
+                };
+
+                if (!GetMonitorInfo(monitorHandle, ref monitorInfo))
+                {
+                    continue;
+                }
+
+                int workWidth = monitorInfo.WorkArea.Right - monitorInfo.WorkArea.Left;
+                int workHeight = monitorInfo.WorkArea.Bottom - monitorInfo.WorkArea.Top;
+
+                results.Add(new DisplayCapture(
+                    monitorHandle,
+                    pixels,
+                    dpiX,
+                    dpiY,
+                    new Rectangle(left, top, width, height),
+                    new Rectangle(monitorInfo.WorkArea.Left, monitorInfo.WorkArea.Top, workWidth, workHeight),
+                    isPrimary));
+            }
+            finally
+            {
+                NativeInterop.FreeScreenshot(screenshotHandle);
+            }
+        }
 
         return results;
     }

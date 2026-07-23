@@ -8,6 +8,30 @@ namespace CaptureKit.Windows.Tests;
 public sealed class DisplayCaptureServiceTests
 {
     [TestMethod]
+    public void ScreenshotPInvoke_AfterPreload_ResolvesValidatedNativeLibrary()
+    {
+        nint screenshotHandle = nint.Zero;
+
+        Action act = () =>
+        {
+            NativeScreenshotLibrary.EnsureAvailable();
+            screenshotHandle = NativeInterop.CaptureAllMonitorsScreenshot();
+        };
+
+        try
+        {
+            act.Should().NotThrow();
+        }
+        finally
+        {
+            if (screenshotHandle != nint.Zero)
+            {
+                NativeInterop.FreeScreenshot(screenshotHandle);
+            }
+        }
+    }
+
+    [TestMethod]
     public void CombineDisplays_WithAdjacentDisplays_ReturnsCombinedBitmap()
     {
         var service = new DisplayCaptureService();

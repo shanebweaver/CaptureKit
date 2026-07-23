@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.0-alpha.1</Version>
-    <Version Condition="$(versionBuild) != ''">$(Version).$(versionBuild)</Version>
+    <CaptureKitVersion>1.0.0</CaptureKitVersion>
+    <Version>$(CaptureKitVersion)</Version>
   </PropertyGroup>
 </Project>

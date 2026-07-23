@@ -16,4 +16,11 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\artifacts\native\$(Configuration)\x64\CaptureKit.Windows.Native.Screenshot.dll"
+             Link="CaptureKit.Windows.Native.Screenshot.dll"
+             CopyToOutputDirectory="PreserveNewest"
+             Condition="Exists('..\..\artifacts\native\$(Configuration)\x64\CaptureKit.Windows.Native.Screenshot.dll')" />
+  </ItemGroup>
 </Project>
