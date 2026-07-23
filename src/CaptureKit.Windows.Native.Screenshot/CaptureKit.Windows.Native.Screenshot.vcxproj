@@ -56,7 +56,7 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup>
-    <IncludePath>$(SolutionDir)src\CaptureKit.Windows.Native;$(SolutionDir)src\CaptureKit.Windows.Native.Core;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)src\CaptureKit.Windows.Native.Recording;$(SolutionDir)src\CaptureKit.Windows.Native.Core;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -89,11 +89,11 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\CaptureKit.Windows.Native\ScreenshotExports.h" />
+    <ClInclude Include="..\CaptureKit.Windows.Native.Recording\ScreenshotExports.h" />
     <ClInclude Include="..\CaptureKit.Windows.Native.Core\WindowsScreenshotCapture.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\CaptureKit.Windows.Native\ScreenshotExports.cpp" />
+    <ClCompile Include="..\CaptureKit.Windows.Native.Recording\ScreenshotExports.cpp" />
     <ClCompile Include="..\CaptureKit.Windows.Native.Core\WindowsScreenshotCapture.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

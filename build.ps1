@@ -144,7 +144,7 @@ if ((Test-Path -LiteralPath $vcpkgBootstrap -PathType Leaf) -and -not (Test-Path
 if (-not $SkipNative) {
     foreach ($platform in $Platforms) {
         foreach ($nativeProject in @(
-            'src\CaptureKit.Windows.Native\CaptureKit.Windows.Native.vcxproj',
+            'src\CaptureKit.Windows.Native.Recording\CaptureKit.Windows.Native.Recording.vcxproj',
             'src\CaptureKit.Windows.Native.Screenshot\CaptureKit.Windows.Native.Screenshot.vcxproj'
         )) {
             Invoke-Process -FilePath $msbuild -Arguments @(
