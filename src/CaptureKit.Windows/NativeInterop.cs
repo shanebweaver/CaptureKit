@@ -5,58 +5,58 @@ namespace CaptureKit.Windows;
 
 internal static partial class NativeInterop
 {
-    internal const string NativeLibraryName = "CaptureKit.Windows.Native.dll";
+    internal const string RecordingNativeLibraryName = "CaptureKit.Windows.Native.Recording.dll";
     internal const string ScreenshotNativeLibraryName = "CaptureKit.Windows.Native.Screenshot.dll";
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult StartScreenRecording(in NativeVideoCaptureOptions options);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult PauseScreenRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult ResumeScreenRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult StopScreenRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult SetScreenRecordingAudioEnabled(uint enabled);
 
-    [DllImport(NativeLibraryName, CharSet = CharSet.Unicode)]
+    [DllImport(RecordingNativeLibraryName, CharSet = CharSet.Unicode)]
     internal static extern CaptureRecorderResult SetScreenRecordingAudioInputSource(string? sourceId);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult SetScreenRecordingAudioInputVolume(uint volumePercentage);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult RegisterVideoFrameCallback(VideoFrameCallback? callback);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult RegisterAudioSampleCallback(AudioSampleCallback? callback);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult StartAudioRecording(in NativeAudioCaptureOptions options);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult PauseAudioRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult ResumeAudioRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult StopAudioRecording();
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult SetAudioRecordingEnabled(uint enabled);
 
-    [DllImport(NativeLibraryName, CharSet = CharSet.Unicode)]
+    [DllImport(RecordingNativeLibraryName, CharSet = CharSet.Unicode)]
     internal static extern CaptureRecorderResult SetAudioRecordingInputSource(string? sourceId);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult SetAudioRecordingInputVolume(uint volumePercentage);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult RegisterAudioRecordingSampleCallback(AudioSampleCallback? callback);
 
     [DllImport(ScreenshotNativeLibraryName)]
@@ -97,7 +97,7 @@ internal static partial class NativeInterop
         nint[] handles,
         int count);
 
-    [DllImport(NativeLibraryName)]
+    [DllImport(RecordingNativeLibraryName)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool ConvertTextureToPixelBuffer(
         nint texturePointer,

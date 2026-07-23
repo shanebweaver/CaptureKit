@@ -8,20 +8,20 @@
   </PropertyGroup>
 
   <Target Name="ValidateCaptureKitWindowsNativeAssets" BeforeTargets="PrepareForBuild" Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != ''">
-    <Error Condition="!Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll')"
-           Text="CaptureKit.Windows is missing CaptureKit.Windows.Native.dll for $(_CaptureKitWindowsNativeRuntimeIdentifier)." />
+    <Error Condition="!Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Recording.dll')"
+           Text="CaptureKit.Windows is missing CaptureKit.Windows.Native.Recording.dll for $(_CaptureKitWindowsNativeRuntimeIdentifier)." />
     <Error Condition="!Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Screenshot.dll')"
            Text="CaptureKit.Windows is missing CaptureKit.Windows.Native.Screenshot.dll for $(_CaptureKitWindowsNativeRuntimeIdentifier)." />
   </Target>
 
   <ItemGroup Condition="'$(_CaptureKitWindowsNativeRuntimeIdentifier)' != ''">
-    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.dll">
-      <Link>CaptureKit.Windows.Native.dll</Link>
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Recording.dll">
+      <Link>CaptureKit.Windows.Native.Recording.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </Content>
-    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb" Condition="Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.pdb')">
-      <Link>CaptureKit.Windows.Native.pdb</Link>
+    <Content Include="$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Recording.pdb" Condition="Exists('$(_CaptureKitWindowsNativeRoot)CaptureKit.Windows.Native.Recording.pdb')">
+      <Link>CaptureKit.Windows.Native.Recording.pdb</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </Content>

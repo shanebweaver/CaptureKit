@@ -54,7 +54,7 @@ function Invoke-DumpBin {
 foreach ($platform in $Platforms) {
     $nativeDirectory = Join-Path $ArtifactRoot "native\$Configuration\$platform"
     $screenshotDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.Screenshot.dll'
-    $recorderDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.dll'
+    $recorderDll = Join-Path $nativeDirectory 'CaptureKit.Windows.Native.Recording.dll'
 
     foreach ($path in @($screenshotDll, $recorderDll)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {

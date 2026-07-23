@@ -32,9 +32,19 @@ try {
             $destination = Join-Path $temporaryRoot "native\Release\$platform"
             $null = New-Item -ItemType Directory -Force -Path $destination
 
-            foreach ($fileName in @(
+            foreach ($legacyFileName in @(
                 'CaptureKit.Windows.Native.dll',
-                'CaptureKit.Windows.Native.pdb',
+                'CaptureKit.Windows.Native.pdb'
+            )) {
+                $legacyEntryName = "runtimes/$runtimeIdentifier/native/$legacyFileName"
+                if ($entryNames -contains $legacyEntryName) {
+                    throw "'$resolvedPackage' still contains legacy asset '$legacyEntryName'."
+                }
+            }
+
+            foreach ($fileName in @(
+                'CaptureKit.Windows.Native.Recording.dll',
+                'CaptureKit.Windows.Native.Recording.pdb',
                 'CaptureKit.Windows.Native.Screenshot.dll',
                 'CaptureKit.Windows.Native.Screenshot.pdb'
             )) {
