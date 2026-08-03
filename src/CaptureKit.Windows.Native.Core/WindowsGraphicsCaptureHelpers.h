@@ -146,8 +146,28 @@ namespace WindowsGraphicsCaptureHelpers
 
         if (FAILED(hr))
         {
-            if (outHr) *outHr = hr;
-            return {};
+            device.reset();
+            context.reset();
+
+            // WARP keeps capture available on systems without a usable hardware
+            // D3D11 adapter, including some virtualized and remote environments.
+            hr = D3D11CreateDevice(
+                nullptr,
+                D3D_DRIVER_TYPE_WARP,
+                nullptr,
+                D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                featureLevels,
+                ARRAYSIZE(featureLevels),
+                D3D11_SDK_VERSION,
+                device.put(),
+                nullptr,
+                context.put());
+
+            if (FAILED(hr))
+            {
+                if (outHr) *outHr = hr;
+                return {};
+            }
         }
 
         if (outHr) *outHr = S_OK;
@@ -207,7 +227,11 @@ namespace WindowsGraphicsCaptureHelpers
 
         HRESULT hr = S_OK;
 
-        wil::com_ptr<IDirect3D11CaptureFramePoolStatics> factory;
+        // CreateFreeThreaded is required so capture can be controlled from a
+        // dedicated MTA thread without a DispatcherQueue. Query the v2 statics
+        // interface directly so older/unsupported systems return a precise
+        // availability HRESULT instead of failing later with a dispatcher error.
+        wil::com_ptr<IDirect3D11CaptureFramePoolStatics2> factory;
 
         HSTRING className{};
         hr = WindowsCreateString(
@@ -237,7 +261,7 @@ namespace WindowsGraphicsCaptureHelpers
         }
 
         wil::com_ptr<IDirect3D11CaptureFramePool> framePool;
-        hr = factory->Create(
+        hr = factory->CreateFreeThreaded(
             direct3DDevice.get(),
             DirectXPixelFormat_B8G8R8A8UIntNormalized,
             CaptureFramePoolBufferCount,

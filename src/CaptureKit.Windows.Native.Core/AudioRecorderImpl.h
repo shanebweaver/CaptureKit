@@ -20,7 +20,7 @@ public:
     bool SetAudioCaptureEnabled(bool enabled);
     bool SetAudioInputSource(const wchar_t* sourceId);
     bool SetAudioInputVolume(uint32_t volumePercentage);
-    void SetAudioSampleCallback(AudioSampleCallback callback);
+    HRESULT SetAudioSampleCallback(AudioSampleCallback callback) noexcept;
 
 private:
     std::mutex m_mutex;

@@ -82,5 +82,4 @@ private:
     
     // State
     bool m_isRunning;
-    bool m_roInitialized = false;
 };

@@ -7,6 +7,8 @@
 #include "IMP4SinkWriter.h"
 #include "CallbackTypes.h"
 #include "ICaptureSession.h"
+#include "NativeExceptionBoundary.h"
+#include "RecorderCallbackContext.h"
 
 #include <mmreg.h>
 #include <strsafe.h>
@@ -62,7 +64,17 @@ WindowsGraphicsCaptureSession::WindowsGraphicsCaptureSession(
 
 WindowsGraphicsCaptureSession::~WindowsGraphicsCaptureSession()
 {
-    Stop();
+    try
+    {
+        Stop();
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsGraphicsCaptureSession::~WindowsGraphicsCaptureSession",
+            hr);
+    }
     // Principle #5 (RAII Everything): Destructor ensures all resources are cleaned up
     // automatically via the following chain:
     //
@@ -86,6 +98,7 @@ WindowsGraphicsCaptureSession::~WindowsGraphicsCaptureSession()
 bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
 {
     HRESULT hr = S_OK;
+    const bool audioRequested = m_config.audioEnabled || !m_config.audioInputSourceId.empty();
 
     // Validate state - must be in Created state to initialize
     if (m_stateMachine.GetState() != CaptureSessionState::Created)
@@ -101,21 +114,16 @@ bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
     }
 
     // Validate dependencies
-    if (!m_mediaClock || !m_audioCaptureSource || !m_videoCaptureSource || !m_sinkWriter)
+    if (!m_mediaClock || !m_videoCaptureSource || !m_sinkWriter || (audioRequested && !m_audioCaptureSource))
     {
-        // Principle #3 (No Nullable Pointers): This check should never fail if the factory
-        // properly initialized all dependencies. After construction, we rely on the type
-        // system (std::unique_ptr) to guarantee these are non-null. This check is defensive
-        // programming for factory implementation errors.
+        // Audio is intentionally optional for a video-only session. All other dependencies,
+        // plus audio when requested, must be supplied by the factory.
         [[maybe_unused]] bool transitioned = m_stateMachine.TryTransitionTo(CaptureSessionState::Failed);
         // Transition should always succeed from Created to Failed
         assert(transitioned && "Transition to Failed should always succeed from Created state");
         if (outHr) *outHr = E_FAIL;
         return false;
     }
-
-    // Connect audio source as clock advancer
-    m_mediaClock->SetClockAdvancer(m_audioCaptureSource.get());
 
     // Initialize sources
     if (!m_videoCaptureSource->Initialize(&hr))
@@ -126,14 +134,24 @@ bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
         return false;
     }
 
-    if (m_audioCaptureSource->Initialize(&hr))
+    m_audioAvailable = false;
+    if (audioRequested)
     {
-        m_audioAvailable = m_audioCaptureSource->GetFormat() != nullptr;
-    }
-    else
-    {
-        OutputDebugStringW(L"[CaptureInterop V1] Audio loopback initialization failed; continuing with video-only timing fallback.\r\n");
-        m_audioAvailable = false;
+        // Audio is the preferred media-clock advancer when it was explicitly requested.
+        // A video-only session must not touch WASAPI or add an AAC stream.
+        m_mediaClock->SetClockAdvancer(m_audioCaptureSource.get());
+
+        if (m_audioCaptureSource->Initialize(&hr) && m_audioCaptureSource->GetFormat())
+        {
+            m_audioAvailable = true;
+        }
+        else
+        {
+            OutputDebugStringW(L"[CaptureInterop V1] Audio source initialization failed; continuing with video-only timing fallback.\r\n");
+            m_audioCaptureSource->SetAudioSampleReadyCallback(nullptr);
+            m_audioCaptureSource->Stop();
+            m_audioCaptureSource.reset();
+        }
     }
 
     // Initialize sink writer
@@ -231,6 +249,7 @@ void WindowsGraphicsCaptureSession::SetupVideoCallback()
                     static_cast<unsigned int>(hr),
                     args.timestamp);
                 OutputDebugStringW(message);
+                return;
             }
 
             // Forward to registered callbacks if any exist
@@ -274,6 +293,21 @@ bool WindowsGraphicsCaptureSession::Start(HRESULT* outHr)
     // Start audio capture
     if (!StartAudioCapture(&hr))
     {
+        [[maybe_unused]] bool transitioned = m_stateMachine.TryTransitionTo(CaptureSessionState::Failed);
+        assert(transitioned && "Transition to Failed should always succeed from Initialized state");
+        if (outHr) *outHr = hr;
+        return false;
+    }
+
+    // Commit the final audio/video topology before starting the capture source.
+    // This makes missing encoders and Media Foundation topology failures part of
+    // synchronous startup instead of surfacing only when the first frame arrives.
+    if (!m_sinkWriter->BeginWriting(&hr))
+    {
+        if (m_audioCaptureSource && m_audioCaptureSource->IsRunning())
+        {
+            m_audioCaptureSource->Stop();
+        }
         [[maybe_unused]] bool transitioned = m_stateMachine.TryTransitionTo(CaptureSessionState::Failed);
         assert(transitioned && "Transition to Failed should always succeed from Initialized state");
         if (outHr) *outHr = hr;
@@ -327,7 +361,19 @@ bool WindowsGraphicsCaptureSession::InitializeSinkWriter(HRESULT* outHr)
         ? static_cast<uint32_t>(m_config.sourceTop)
         : 0;
 
-    if (!m_sinkWriter->Initialize(m_config.outputPath.c_str(), device, width, height, &hr, sourceLeft, sourceTop))
+    auto initializeVideoSink = [&]()
+    {
+        return m_sinkWriter->Initialize(
+            m_config.outputPath.c_str(),
+            device,
+            width,
+            height,
+            &hr,
+            sourceLeft,
+            sourceTop);
+    };
+
+    if (!initializeVideoSink())
     {
         if (outHr) *outHr = hr;
         return false;
@@ -341,8 +387,27 @@ bool WindowsGraphicsCaptureSession::InitializeSinkWriter(HRESULT* outHr)
     {
         if (!m_sinkWriter->InitializeAudioStream(audioFormat, &hr))
         {
-            if (outHr) *outHr = hr;
-            return false;
+            wchar_t message[256]{};
+            StringCchPrintfW(
+                message,
+                ARRAYSIZE(message),
+                L"[CaptureInterop V1] AAC stream initialization failed; rebuilding a video-only sink. HRESULT=0x%08X\r\n",
+                static_cast<unsigned int>(hr));
+            OutputDebugStringW(message);
+
+            // Adding an audio stream can partially mutate the Media Foundation sink. Finalize
+            // that sink and create a fresh video-only one instead of attempting to use it.
+            m_audioCaptureSource->SetAudioSampleReadyCallback(nullptr);
+            m_audioCaptureSource->Stop();
+            m_audioCaptureSource.reset();
+            m_audioAvailable = false;
+            m_sinkWriter->Finalize();
+
+            if (!initializeVideoSink())
+            {
+                if (outHr) *outHr = hr;
+                return false;
+            }
         }
     }
     
@@ -371,11 +436,13 @@ bool WindowsGraphicsCaptureSession::StartAudioCapture(HRESULT* outHr)
         StringCchPrintfW(
             message,
             ARRAYSIZE(message),
-            L"[CaptureInterop V1] Audio loopback start failed; continuing with video-only timing fallback. HRESULT=0x%08X\r\n",
+            L"[CaptureInterop V1] Audio source start failed; continuing with video-only timing fallback. HRESULT=0x%08X\r\n",
             static_cast<unsigned int>(hr));
         OutputDebugStringW(message);
 
         m_audioCaptureSource->SetAudioSampleReadyCallback(nullptr);
+        m_audioCaptureSource->Stop();
+        m_audioCaptureSource.reset();
         m_audioAvailable = false;
         m_sinkWriter->Finalize();
         if (!InitializeSinkWriter(&hr))
@@ -530,7 +597,7 @@ void WindowsGraphicsCaptureSession::SetAudioInputVolume(uint32_t volumePercentag
     }
 }
 
-void WindowsGraphicsCaptureSession::SetVideoFrameCallback(VideoFrameCallback callback)
+HRESULT WindowsGraphicsCaptureSession::SetVideoFrameCallback(VideoFrameCallback callback) noexcept
 {
     try
     {
@@ -546,19 +613,25 @@ void WindowsGraphicsCaptureSession::SetVideoFrameCallback(VideoFrameCallback cal
             m_videoCallbackHandle = m_videoCallbackRegistry.Register([callback](const VideoFrameData& data) {
                 if (callback)  // Extra safety check
                 {
+                    CaptureKit::Native::RecorderCallbackScope callbackScope;
                     callback(const_cast<VideoFrameData*>(&data));
                 }
             });
         }
+
+        return S_OK;
     }
     catch (...)
     {
-        // Swallow any exceptions to prevent crash
-        // Callback registration failure is not fatal
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsGraphicsCaptureSession::SetVideoFrameCallback",
+            hr);
+        return hr;
     }
 }
 
-void WindowsGraphicsCaptureSession::SetAudioSampleCallback(AudioSampleCallback callback)
+HRESULT WindowsGraphicsCaptureSession::SetAudioSampleCallback(AudioSampleCallback callback) noexcept
 {
     try
     {
@@ -574,14 +647,20 @@ void WindowsGraphicsCaptureSession::SetAudioSampleCallback(AudioSampleCallback c
             m_audioCallbackHandle = m_audioCallbackRegistry.Register([callback](const AudioSampleData& data) {
                 if (callback)  // Extra safety check
                 {
+                    CaptureKit::Native::RecorderCallbackScope callbackScope;
                     callback(const_cast<AudioSampleData*>(&data));
                 }
             });
         }
+
+        return S_OK;
     }
     catch (...)
     {
-        // Swallow any exceptions to prevent crash
-        // Callback registration failure is not fatal
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsGraphicsCaptureSession::SetAudioSampleCallback",
+            hr);
+        return hr;
     }
 }

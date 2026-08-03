@@ -35,7 +35,9 @@ public:
     /// </summary>
     /// <param name="config">Configuration settings for the capture session.</param>
     /// <returns>A unique pointer to a new WindowsGraphicsCaptureSession.</returns>
-    std::unique_ptr<ICaptureSession> CreateSession(const CaptureSessionConfig& config) override;
+    std::unique_ptr<ICaptureSession> CreateSession(
+        const CaptureSessionConfig& config,
+        HRESULT* outHr = nullptr) override;
 
 private:
     std::unique_ptr<IMediaClockFactory> m_mediaClockFactory;

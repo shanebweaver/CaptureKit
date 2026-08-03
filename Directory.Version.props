@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <CaptureKitVersion>1.0.0</CaptureKitVersion>
+    <CaptureKitVersion>1.0.3</CaptureKitVersion>
     <Version>$(CaptureKitVersion)</Version>
   </PropertyGroup>
 </Project>

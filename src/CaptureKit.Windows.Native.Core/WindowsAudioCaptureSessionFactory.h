@@ -14,7 +14,9 @@ public:
         std::unique_ptr<IAudioCaptureSourceFactory> audioCaptureSourceFactory,
         std::unique_ptr<IWavSinkWriterFactory> wavSinkWriterFactory);
 
-    std::unique_ptr<WindowsAudioCaptureSession> CreateSession(const AudioRecordingConfig& config);
+    std::unique_ptr<WindowsAudioCaptureSession> CreateSession(
+        const AudioRecordingConfig& config,
+        HRESULT* outHr = nullptr);
 
 private:
     std::unique_ptr<IMediaClockFactory> m_mediaClockFactory;

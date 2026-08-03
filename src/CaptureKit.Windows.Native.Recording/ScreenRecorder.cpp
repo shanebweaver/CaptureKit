@@ -1,8 +1,21 @@
 #include "ScreenRecorder.h"
+#include "RecorderExceptionGuard.h"
 #include "ScreenRecorderImpl.h"
 #include <Windows.h>
+#include <mutex>
 
-static ScreenRecorderImpl g_recorder;
+namespace
+{
+    std::mutex g_recorderMutex;
+
+    ScreenRecorderImpl& GetRecorder()
+    {
+        // Lazy construction keeps allocation/initialization exceptions inside
+        // the exported function exception guards below.
+        static ScreenRecorderImpl recorder;
+        return recorder;
+    }
+}
 
 static CaptureRecorderResult RecorderResult(CaptureRecorderStatus status, HRESULT hr)
 {
@@ -23,130 +36,159 @@ extern "C"
 {
     __declspec(dllexport) CaptureRecorderResult StartScreenRecording(const CaptureRecordingOptions* options)
     {
-        if (!options || !options->outputPath)
-        {
-            return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-        }
+        return GuardRecorderCall(
+            L"StartScreenRecording",
+            CaptureRecorderStatus::StartFailed,
+            [&]() -> CaptureRecorderResult {
+                std::lock_guard<std::mutex> lock(g_recorderMutex);
 
-        CaptureSessionConfig config;
-        switch (options->targetKind)
-        {
-        case CaptureRecordingTargetKind::Monitor:
-            if (!options->hMonitor)
-            {
-                return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-            }
-            config = CaptureSessionConfig::ForMonitor(
-                options->hMonitor,
-                options->outputPath,
-                options->captureAudio != 0,
-                options->frameRate,
-                options->videoBitrate,
-                options->audioBitrate,
-                options->audioInputSourceId ? options->audioInputSourceId : L"",
-                options->audioInputVolumePercentage);
-            break;
+                if (!options || !options->outputPath)
+                {
+                    return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                }
 
-        case CaptureRecordingTargetKind::Window:
-            if (!options->hwnd)
-            {
-                return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-            }
-            config = CaptureSessionConfig::ForWindow(
-                options->hwnd,
-                options->outputPath,
-                options->captureAudio != 0,
-                options->frameRate,
-                options->videoBitrate,
-                options->audioBitrate,
-                options->audioInputSourceId ? options->audioInputSourceId : L"",
-                options->audioInputVolumePercentage);
-            break;
+                CaptureSessionConfig config;
+                switch (options->targetKind)
+                {
+                case CaptureRecordingTargetKind::Monitor:
+                    if (!options->hMonitor)
+                    {
+                        return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                    }
+                    config = CaptureSessionConfig::ForMonitor(
+                        options->hMonitor,
+                        options->outputPath,
+                        options->captureAudio != 0,
+                        options->frameRate,
+                        options->videoBitrate,
+                        options->audioBitrate,
+                        options->audioInputSourceId ? options->audioInputSourceId : L"",
+                        options->audioInputVolumePercentage);
+                    break;
 
-        case CaptureRecordingTargetKind::Rectangle:
-            if (!options->hMonitor || options->width <= 0 || options->height <= 0)
-            {
-                return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-            }
-            config = CaptureSessionConfig::ForRectangle(
-                options->hMonitor,
-                options->left,
-                options->top,
-                static_cast<uint32_t>(options->width),
-                static_cast<uint32_t>(options->height),
-                options->outputPath,
-                options->captureAudio != 0,
-                options->frameRate,
-                options->videoBitrate,
-                options->audioBitrate,
-                options->audioInputSourceId ? options->audioInputSourceId : L"",
-                options->audioInputVolumePercentage);
-            break;
+                case CaptureRecordingTargetKind::Window:
+                    if (!options->hwnd)
+                    {
+                        return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                    }
+                    config = CaptureSessionConfig::ForWindow(
+                        options->hwnd,
+                        options->outputPath,
+                        options->captureAudio != 0,
+                        options->frameRate,
+                        options->videoBitrate,
+                        options->audioBitrate,
+                        options->audioInputSourceId ? options->audioInputSourceId : L"",
+                        options->audioInputVolumePercentage);
+                    break;
 
-        default:
-            return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-        }
+                case CaptureRecordingTargetKind::Rectangle:
+                    if (!options->hMonitor || options->width <= 0 || options->height <= 0)
+                    {
+                        return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                    }
+                    config = CaptureSessionConfig::ForRectangle(
+                        options->hMonitor,
+                        options->left,
+                        options->top,
+                        static_cast<uint32_t>(options->width),
+                        static_cast<uint32_t>(options->height),
+                        options->outputPath,
+                        options->captureAudio != 0,
+                        options->frameRate,
+                        options->videoBitrate,
+                        options->audioBitrate,
+                        options->audioInputSourceId ? options->audioInputSourceId : L"",
+                        options->audioInputVolumePercentage);
+                    break;
 
-        HRESULT hr = S_OK;
-        if (!g_recorder.StartRecording(config, &hr))
-        {
-            return RecorderResult(hr == E_INVALIDARG ? CaptureRecorderStatus::InvalidArgument : CaptureRecorderStatus::StartFailed, hr);
-        }
+                default:
+                    return RecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                }
 
-        return Success();
+                HRESULT hr = S_OK;
+                if (!GetRecorder().StartRecording(config, &hr))
+                {
+                    return RecorderResult(
+                        hr == E_INVALIDARG
+                            ? CaptureRecorderStatus::InvalidArgument
+                            : hr == E_ILLEGAL_METHOD_CALL
+                                ? CaptureRecorderStatus::InvalidState
+                                : CaptureRecorderStatus::StartFailed,
+                        hr);
+                }
+
+                return Success();
+            });
     }
 
     __declspec(dllexport) CaptureRecorderResult PauseScreenRecording()
     {
-        return g_recorder.PauseRecording()
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"PauseScreenRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().PauseRecording() ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult ResumeScreenRecording()
     {
-        return g_recorder.ResumeRecording()
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"ResumeScreenRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().ResumeRecording() ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult StopScreenRecording()
     {
-        return g_recorder.StopRecording()
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"StopScreenRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().StopRecording() ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetScreenRecordingAudioEnabled(uint32_t enabled)
     {
-        return g_recorder.SetAudioCaptureEnabled(enabled != 0)
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"SetScreenRecordingAudioEnabled", CaptureRecorderStatus::InvalidState, [enabled] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().SetAudioCaptureEnabled(enabled != 0) ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetScreenRecordingAudioInputSource(const wchar_t* sourceId)
     {
-        return g_recorder.SetAudioInputSource(sourceId ? sourceId : L"")
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"SetScreenRecordingAudioInputSource", CaptureRecorderStatus::InvalidState, [sourceId] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().SetAudioInputSource(sourceId ? sourceId : L"") ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetScreenRecordingAudioInputVolume(uint32_t volumePercentage)
     {
-        return g_recorder.SetAudioInputVolume(volumePercentage)
-            ? Success()
-            : NoActiveSession();
+        return GuardRecorderCall(L"SetScreenRecordingAudioInputVolume", CaptureRecorderStatus::InvalidState, [volumePercentage] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().SetAudioInputVolume(volumePercentage) ? Success() : NoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult RegisterVideoFrameCallback(VideoFrameCallback callback)
     {
-        g_recorder.SetVideoFrameCallback(callback);
-        return Success();
+        return GuardRecorderCall(L"RegisterVideoFrameCallback", CaptureRecorderStatus::InvalidState, [callback] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            const HRESULT hr = GetRecorder().SetVideoFrameCallback(callback);
+            return SUCCEEDED(hr)
+                ? Success()
+                : RecorderResult(CaptureRecorderStatus::InvalidState, hr);
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult RegisterAudioSampleCallback(AudioSampleCallback callback)
     {
-        g_recorder.SetAudioSampleCallback(callback);
-        return Success();
+        return GuardRecorderCall(L"RegisterAudioSampleCallback", CaptureRecorderStatus::InvalidState, [callback] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            const HRESULT hr = GetRecorder().SetAudioSampleCallback(callback);
+            return SUCCEEDED(hr)
+                ? Success()
+                : RecorderResult(CaptureRecorderStatus::InvalidState, hr);
+        });
     }
 }

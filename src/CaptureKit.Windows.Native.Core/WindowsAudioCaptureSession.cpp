@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "WindowsAudioCaptureSession.h"
 #include "MediaTimeConstants.h"
+#include "NativeExceptionBoundary.h"
+#include "RecorderCallbackContext.h"
 #include <strsafe.h>
 #include <cassert>
 
@@ -18,7 +20,17 @@ WindowsAudioCaptureSession::WindowsAudioCaptureSession(
 
 WindowsAudioCaptureSession::~WindowsAudioCaptureSession()
 {
-    Stop();
+    try
+    {
+        Stop();
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsAudioCaptureSession::~WindowsAudioCaptureSession",
+            hr);
+    }
 }
 
 bool WindowsAudioCaptureSession::Initialize(HRESULT* outHr)
@@ -209,7 +221,7 @@ void WindowsAudioCaptureSession::SetAudioInputVolume(uint32_t volumePercentage)
     }
 }
 
-void WindowsAudioCaptureSession::SetAudioSampleCallback(AudioSampleCallback callback)
+HRESULT WindowsAudioCaptureSession::SetAudioSampleCallback(AudioSampleCallback callback) noexcept
 {
     try
     {
@@ -221,12 +233,20 @@ void WindowsAudioCaptureSession::SetAudioSampleCallback(AudioSampleCallback call
         if (callback)
         {
             m_audioCallbackHandle = m_audioCallbackRegistry.Register([callback](const AudioSampleData& data) {
+                CaptureKit::Native::RecorderCallbackScope callbackScope;
                 callback(const_cast<AudioSampleData*>(&data));
             });
         }
+
+        return S_OK;
     }
     catch (...)
     {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsAudioCaptureSession::SetAudioSampleCallback",
+            hr);
+        return hr;
     }
 }
 

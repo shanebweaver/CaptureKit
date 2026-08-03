@@ -21,6 +21,9 @@
     <ClInclude Include="ScreenRecorder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RecorderExceptionGuard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="TextureConversionExports.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -6,6 +6,38 @@
 
 namespace
 {
+    class ThreadComInitialization final
+    {
+    public:
+        explicit ThreadComInitialization(DWORD concurrencyModel) noexcept
+            : m_result(CoInitializeEx(nullptr, concurrencyModel))
+            , m_mustUninitialize(SUCCEEDED(m_result))
+        {
+        }
+
+        ~ThreadComInitialization() noexcept
+        {
+            if (m_mustUninitialize)
+            {
+                CoUninitialize();
+            }
+        }
+
+        HRESULT Result() const noexcept { return m_result; }
+
+    private:
+        HRESULT m_result;
+        bool m_mustUninitialize;
+    };
+
+    ThreadComInitialization& GetThreadComInitialization() noexcept
+    {
+        // Keep COM initialized for the lifetime of this control thread. The
+        // thread-local destructor balances CoInitializeEx on that same thread.
+        thread_local ThreadComInitialization initialization(COINIT_MULTITHREADED);
+        return initialization;
+    }
+
     std::wstring GetWasapiEndpointId(const wchar_t* deviceId)
     {
         if (!deviceId || deviceId[0] == L'\0')
@@ -36,8 +68,7 @@ AudioCaptureDevice::AudioCaptureDevice() = default;
 
 AudioCaptureDevice::~AudioCaptureDevice()
 {
-    Stop();
-    ReleaseResources();
+    Shutdown();
     // Principle #5 (RAII Everything): All COM objects automatically released via wil::com_ptr
     // - m_captureClient, m_audioClient, m_device, m_deviceEnumerator: wil::com_ptr handles Release()
     // - m_waveFormat: wil::unique_cotaskmem_ptr calls CoTaskMemFree()
@@ -52,20 +83,13 @@ bool AudioCaptureDevice::Initialize(bool loopback, const wchar_t* deviceId, HRES
 {
     ReleaseResources();
 
-    // Initialize COM for this thread
-    HRESULT hr = S_OK;
-    if (!m_comInitialized)
-    {
-        hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    }
+    // COM apartment initialization is thread-affine. Retain a balanced
+    // thread-local apartment instead of uninitializing it from a later Stop thread.
+    HRESULT hr = GetThreadComInitialization().Result();
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
     {
         if (outHr) *outHr = hr;
         return false;
-    }
-    if (SUCCEEDED(hr) && !m_comInitialized)
-    {
-        m_comInitialized = true;
     }
 
     // Create device enumerator
@@ -190,19 +214,30 @@ void AudioCaptureDevice::Stop()
     }
 }
 
+void AudioCaptureDevice::Shutdown()
+{
+    Stop();
+    ReleaseResources();
+}
+
 void AudioCaptureDevice::ReleaseResources()
 {
+    if (!m_captureClient && !m_audioClient && !m_device &&
+        !m_deviceEnumerator && !m_waveFormat)
+    {
+        return;
+    }
+
+    // Stop may run on another control thread. Ensure COM is initialized before
+    // releasing WASAPI interfaces on that thread.
+    (void)GetThreadComInitialization();
+
     m_captureClient.reset();
     m_audioClient.reset();
     m_device.reset();
     m_deviceEnumerator.reset();
     m_waveFormat.reset();
 
-    if (m_comInitialized)
-    {
-        CoUninitialize();
-        m_comInitialized = false;
-    }
 }
 
 // ============================================================================

@@ -7,11 +7,33 @@
 #include "SimpleMediaClockFactory.h"
 #include "CaptureSessionConfig.h"
 #include "ICaptureSessionFactory.h"
+#include "NativeExceptionBoundary.h"
 
 #include <strsafe.h>
 #include <Windows.h>
 #include <memory>
 #include <utility>
+
+namespace
+{
+    void StopSessionBestEffort(ICaptureSession* session, const wchar_t* boundary) noexcept
+    {
+        if (!session)
+        {
+            return;
+        }
+
+        try
+        {
+            session->Stop();
+        }
+        catch (...)
+        {
+            const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+            CaptureKit::Native::ReportBoundaryException(boundary, hr);
+        }
+    }
+}
 
 ScreenRecorderImpl::ScreenRecorderImpl(std::unique_ptr<ICaptureSessionFactory> factory)
     : m_factory(std::move(factory))
@@ -34,13 +56,25 @@ ScreenRecorderImpl::ScreenRecorderImpl()
 
 ScreenRecorderImpl::~ScreenRecorderImpl()
 {
-    StopRecording();
+    try
+    {
+        StopRecording();
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(L"ScreenRecorderImpl::~ScreenRecorderImpl", hr);
+    }
     // Principle #5 (RAII Everything): Destructor ensures cleanup even if caller forgets
 }
 
 bool ScreenRecorderImpl::StartRecording(const CaptureSessionConfig& config, HRESULT* outHr)
 {
-    StopRecording();
+    if (HasActiveSession())
+    {
+        if (outHr) *outHr = E_ILLEGAL_METHOD_CALL;
+        return false;
+    }
 
     if (!config.IsValid())
     {
@@ -48,31 +82,56 @@ bool ScreenRecorderImpl::StartRecording(const CaptureSessionConfig& config, HRES
         return false;
     }
 
-    m_captureSession = m_factory->CreateSession(config);
-    if (!m_captureSession)
+    HRESULT createHr = S_OK;
+    auto session = m_factory->CreateSession(config, &createHr);
+    if (!session)
     {
-        if (outHr) *outHr = E_FAIL;
+        if (outHr) *outHr = FAILED(createHr) ? createHr : E_FAIL;
         return false;
     }
 
     if (m_videoFrameCallback)
     {
-        m_captureSession->SetVideoFrameCallback(m_videoFrameCallback);
+        const HRESULT callbackHr = session->SetVideoFrameCallback(m_videoFrameCallback);
+        if (FAILED(callbackHr))
+        {
+            StopSessionBestEffort(
+                session.get(),
+                L"ScreenRecorderImpl::StartRecording video callback rollback");
+            if (outHr) *outHr = callbackHr;
+            return false;
+        }
     }
     if (m_audioSampleCallback)
     {
-        m_captureSession->SetAudioSampleCallback(m_audioSampleCallback);
+        const HRESULT callbackHr = session->SetAudioSampleCallback(m_audioSampleCallback);
+        if (FAILED(callbackHr))
+        {
+            StopSessionBestEffort(
+                session.get(),
+                L"ScreenRecorderImpl::StartRecording audio callback rollback");
+            if (outHr) *outHr = callbackHr;
+            return false;
+        }
     }
 
     HRESULT hr = S_OK;
-    if (!m_captureSession->Start(&hr))
+    try
     {
-        m_captureSession->Stop();
-        m_captureSession.reset();
-        if (outHr) *outHr = hr;
-        return false;
+        if (!session->Start(&hr))
+        {
+            StopSessionBestEffort(session.get(), L"ScreenRecorderImpl::StartRecording rollback");
+            if (outHr) *outHr = hr;
+            return false;
+        }
+    }
+    catch (...)
+    {
+        StopSessionBestEffort(session.get(), L"ScreenRecorderImpl::StartRecording exception rollback");
+        throw;
     }
 
+    m_captureSession = std::move(session);
     if (outHr) *outHr = S_OK;
     return true;
 }
@@ -112,8 +171,11 @@ bool ScreenRecorderImpl::StopRecording()
         return false;
     }
 
-    m_captureSession->Stop();
-    m_captureSession.reset();
+    // Remove the session from global recorder state before finalization. A
+    // throwing Stop can then be returned by the C ABI guard without poisoning
+    // the next recording attempt.
+    auto session = std::move(m_captureSession);
+    session->Stop();
     return true;
 }
 
@@ -149,26 +211,34 @@ bool ScreenRecorderImpl::SetAudioInputVolume(uint32_t volumePercentage)
     return true;
 }
 
-void ScreenRecorderImpl::SetVideoFrameCallback(VideoFrameCallback callback)
+HRESULT ScreenRecorderImpl::SetVideoFrameCallback(VideoFrameCallback callback) noexcept
 {
-    // Store callback so it persists across session recreation
-    m_videoFrameCallback = callback;
-    
-    // Also apply to current session if one exists
     if (HasActiveSession())
     {
-        m_captureSession->SetVideoFrameCallback(callback);
+        const HRESULT hr = m_captureSession->SetVideoFrameCallback(callback);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
     }
+
+    // Persist the callback only after the active session accepted the update.
+    m_videoFrameCallback = callback;
+    return S_OK;
 }
 
-void ScreenRecorderImpl::SetAudioSampleCallback(AudioSampleCallback callback)
+HRESULT ScreenRecorderImpl::SetAudioSampleCallback(AudioSampleCallback callback) noexcept
 {
-    // Store callback so it persists across session recreation
-    m_audioSampleCallback = callback;
-    
-    // Also apply to current session if one exists
     if (HasActiveSession())
     {
-        m_captureSession->SetAudioSampleCallback(callback);
+        const HRESULT hr = m_captureSession->SetAudioSampleCallback(callback);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
     }
+
+    // Persist the callback only after the active session accepted the update.
+    m_audioSampleCallback = callback;
+    return S_OK;
 }

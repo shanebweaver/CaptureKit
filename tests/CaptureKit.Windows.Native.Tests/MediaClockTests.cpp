@@ -248,5 +248,31 @@ namespace CaptureInteropTests
             Assert::IsTrue(relativeTime >= 800000LL && relativeTime <= 1200000LL, 
                 L"Relative time should be approximately 100ms");
         }
+
+        TEST_METHOD(Clock_RelativeTimeFreezesWhilePausedAndExcludesPauseDuration)
+        {
+            SimpleMediaClock clock;
+            LARGE_INTEGER qpc{};
+            QueryPerformanceCounter(&qpc);
+            clock.Start(qpc.QuadPart);
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+
+            clock.Pause();
+            QueryPerformanceCounter(&qpc);
+            const LONGLONG pausedTime1 = clock.GetRelativeTime(qpc.QuadPart);
+            std::this_thread::sleep_for(std::chrono::milliseconds(60));
+            QueryPerformanceCounter(&qpc);
+            const LONGLONG pausedTime2 = clock.GetRelativeTime(qpc.QuadPart);
+
+            Assert::AreEqual(pausedTime1, pausedTime2);
+
+            clock.Resume();
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            QueryPerformanceCounter(&qpc);
+            const LONGLONG resumedTime = clock.GetRelativeTime(qpc.QuadPart);
+
+            Assert::IsTrue(resumedTime > pausedTime2);
+            Assert::IsTrue(resumedTime < 900000LL, L"Paused wall time must not appear in media time.");
+        }
     };
 }

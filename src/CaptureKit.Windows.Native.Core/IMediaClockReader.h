@@ -40,6 +40,12 @@ public:
     virtual bool IsRunning() const = 0;
 
     /// <summary>
+    /// Check whether the media timeline is paused. The default keeps existing
+    /// lightweight clock readers source-compatible.
+    /// </summary>
+    virtual bool IsPaused() const { return false; }
+
+    /// <summary>
     /// Get the frequency of the QueryPerformanceCounter in ticks per second.
     /// Used for converting between QPC units and time units.
     /// </summary>

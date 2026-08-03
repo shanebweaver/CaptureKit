@@ -10,6 +10,7 @@ public static class CaptureKitWindowsServiceCollectionExtensions
         services.AddSingleton<IDisplayCaptureService, DisplayCaptureService>();
         services.AddSingleton<IImageCaptureService, ImageCaptureService>();
         services.AddSingleton<IVideoCaptureService, VideoCaptureService>();
+        services.AddSingleton<IVideoCaptureSupportService, WindowsVideoCaptureSupportService>();
         services.AddSingleton<IAudioCaptureService, AudioCaptureService>();
         services.AddSingleton<ITexturePixelConverter, TexturePixelConverter>();
 

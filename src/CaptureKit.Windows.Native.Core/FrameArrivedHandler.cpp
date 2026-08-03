@@ -2,12 +2,40 @@
 #include "FrameArrivedHandler.h"
 #include "IVideoCaptureSource.h"
 #include "IMediaClockReader.h"
+#include "NativeExceptionBoundary.h"
 
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Graphics::DirectX;
 using namespace ABI::Windows::Graphics::DirectX::Direct3D11;
 using namespace ABI::Windows::Graphics;
 using namespace ABI::Windows::Graphics::Capture;
+
+namespace
+{
+    class ScopedComInitialization final
+    {
+    public:
+        explicit ScopedComInitialization(DWORD concurrencyModel) noexcept
+            : m_result(CoInitializeEx(nullptr, concurrencyModel))
+            , m_mustUninitialize(SUCCEEDED(m_result))
+        {
+        }
+
+        ~ScopedComInitialization() noexcept
+        {
+            if (m_mustUninitialize)
+            {
+                CoUninitialize();
+            }
+        }
+
+        HRESULT Result() const noexcept { return m_result; }
+
+    private:
+        HRESULT m_result;
+        bool m_mustUninitialize;
+    };
+}
 
 FrameArrivedHandler::FrameArrivedHandler(VideoFrameReadyCallback callback, IMediaClockReader* clockReader) noexcept
     : m_callback(std::move(callback)),
@@ -22,15 +50,30 @@ FrameArrivedHandler::FrameArrivedHandler(VideoFrameReadyCallback callback, IMedi
     // This prevents accessing uninitialized members in ProcessingThreadProc
 }
 
-void FrameArrivedHandler::StartProcessing()
+bool FrameArrivedHandler::StartProcessing(HRESULT* outHr) noexcept
 {
     // Start background processing thread after object is fully constructed
     // Ensure only one thread is created (thread-safe)
     bool expected = false;
     if (m_processingStarted.compare_exchange_strong(expected, true))
     {
-        m_processingThread = std::thread(&FrameArrivedHandler::ProcessingThreadProc, this);
+        try
+        {
+            m_processingThread = std::thread(&FrameArrivedHandler::ProcessingThreadProc, this);
+        }
+        catch (...)
+        {
+            const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+            CaptureKit::Native::ReportBoundaryException(L"FrameArrivedHandler::StartProcessing", hr);
+            m_processingStarted = false;
+            m_running = false;
+            if (outHr) *outHr = hr;
+            return false;
+        }
     }
+
+    if (outHr) *outHr = S_OK;
+    return true;
 }
 
 FrameArrivedHandler::~FrameArrivedHandler()
@@ -80,6 +123,13 @@ HRESULT STDMETHODCALLTYPE FrameArrivedHandler::QueryInterface(REFIID riid, void*
         AddRef();
         return S_OK;
     }
+
+    if (riid == __uuidof(IAgileObject))
+    {
+        *ppvObject = static_cast<IAgileObject*>(this);
+        AddRef();
+        return S_OK;
+    }
         
     return E_NOINTERFACE;
 }
@@ -105,17 +155,19 @@ ULONG STDMETHODCALLTYPE FrameArrivedHandler::Release()
 
 HRESULT STDMETHODCALLTYPE FrameArrivedHandler::Invoke(IDirect3D11CaptureFramePool* sender, IInspectable* /*args*/) noexcept
 {
-    if (!m_callback)
+    try
     {
-        return E_POINTER;
-    }
+        if (!m_callback)
+        {
+            return E_POINTER;
+        }
 
-    wil::com_ptr<IDirect3D11CaptureFrame> frame;
-    HRESULT hr = sender->TryGetNextFrame(frame.put());
-    if (FAILED(hr) || !frame)
-    {
-        return hr;
-    }
+        wil::com_ptr<IDirect3D11CaptureFrame> frame;
+        HRESULT hr = sender->TryGetNextFrame(frame.put());
+        if (FAILED(hr) || !frame)
+        {
+            return hr;
+        }
 
     wil::com_ptr<IDirect3DSurface> surface;
     hr = frame->get_Surface(surface.put());
@@ -156,7 +208,16 @@ HRESULT STDMETHODCALLTYPE FrameArrivedHandler::Invoke(IDirect3D11CaptureFramePoo
         m_queueCV.notify_one();
     }
 
-    return S_OK;
+        return S_OK;
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(L"FrameArrivedHandler::Invoke", hr);
+        m_running = false;
+        m_queueCV.notify_one();
+        return hr;
+    }
 }
 
 LONGLONG FrameArrivedHandler::GetFrameTimestamp() const
@@ -177,48 +238,67 @@ LONGLONG FrameArrivedHandler::GetFrameTimestamp() const
     return m_clockReader->GetRelativeTime(qpc.QuadPart);
 }
 
-void FrameArrivedHandler::ProcessingThreadProc()
+void FrameArrivedHandler::ProcessingThreadProc() noexcept
 {
-    while (m_running)
+    ScopedComInitialization comInitialization(COINIT_MULTITHREADED);
+    if (FAILED(comInitialization.Result()))
     {
-        QueuedFrame frame;
-        
-        {
-            std::unique_lock<std::mutex> lock(m_queueMutex);
-            m_queueCV.wait(lock, [this] { return m_pendingFrame.has_value() || !m_running; });
-            
-            if (!m_running && !m_pendingFrame.has_value())
-            {
-                break;
-            }
-            
-            if (m_pendingFrame.has_value())
-            {
-                frame = std::move(*m_pendingFrame);
-                m_pendingFrame.reset();
-            }
-            else
-            {
-                continue;
-            }
-        }
-        
-        // Check if callback is still valid and we're still running before invoking
-        if (frame.texture && m_callback && m_running)
-        {
-            if (!m_frameAdmission.ShouldAccept(frame.relativeTimestamp))
-            {
-                m_droppedFrameCount.fetch_add(1, std::memory_order_relaxed);
-                continue;
-            }
+        CaptureKit::Native::ReportBoundaryException(
+            L"FrameArrivedHandler::ProcessingThreadProc CoInitializeEx",
+            comInitialization.Result());
+        m_running = false;
+        return;
+    }
 
-            VideoFrameReadyEventArgs args;
-            args.pTexture = frame.texture.get();
-            args.timestamp = frame.relativeTimestamp;
+    try
+    {
+        while (m_running)
+        {
+            QueuedFrame frame;
             
-            m_callback(args);
-            m_processedFrameCount.fetch_add(1, std::memory_order_relaxed);
+            {
+                std::unique_lock<std::mutex> lock(m_queueMutex);
+                m_queueCV.wait(lock, [this] { return m_pendingFrame.has_value() || !m_running; });
+
+                if (!m_running && !m_pendingFrame.has_value())
+                {
+                    break;
+                }
+
+                if (m_pendingFrame.has_value())
+                {
+                    frame = std::move(*m_pendingFrame);
+                    m_pendingFrame.reset();
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            
+            // Check if callback is still valid and we're still running before invoking
+            if (frame.texture && m_callback && m_running)
+            {
+                if (!m_frameAdmission.ShouldAccept(frame.relativeTimestamp))
+                {
+                    m_droppedFrameCount.fetch_add(1, std::memory_order_relaxed);
+                    continue;
+                }
+
+                VideoFrameReadyEventArgs args;
+                args.pTexture = frame.texture.get();
+                args.timestamp = frame.relativeTimestamp;
+
+                m_callback(args);
+                m_processedFrameCount.fetch_add(1, std::memory_order_relaxed);
+            }
         }
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(L"FrameArrivedHandler::ProcessingThreadProc", hr);
+        m_running = false;
     }
     
     // Don't drain the remaining frame after stopping to prevent callbacks after shutdown.
@@ -236,7 +316,13 @@ EventRegistrationToken RegisterFrameArrivedHandler(
     auto handler = new FrameArrivedHandler(callback, clockReader);
     
     // Start the processing thread after object is fully constructed
-    handler->StartProcessing();
+    HRESULT processingHr = S_OK;
+    if (!handler->StartProcessing(&processingHr))
+    {
+        handler->Release();
+        if (outHr) *outHr = processingHr;
+        return token;
+    }
     
     HRESULT hr = framePool->add_FrameArrived(handler, &token);
     

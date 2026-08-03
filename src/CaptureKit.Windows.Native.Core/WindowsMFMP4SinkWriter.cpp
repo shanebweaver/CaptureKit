@@ -203,10 +203,33 @@ bool WindowsMFMP4SinkWriter::InitializeAudioStream(WAVEFORMATEX* audioFormat, lo
     m_audioStreamIndex = audioStreamIndex;
     m_hasAudioStream = true;
 
-    hr = m_sinkWriter->BeginWriting();
-    if (FAILED(hr)) { if (outHr) *outHr = hr; return false; }
-    m_hasBegunWriting = true;
+    return BeginWriting(outHr);
+}
 
+bool WindowsMFMP4SinkWriter::BeginWriting(long* outHr)
+{
+    std::lock_guard<std::mutex> lock(m_writeMutex);
+
+    if (!m_sinkWriter)
+    {
+        if (outHr) *outHr = E_NOT_VALID_STATE;
+        return false;
+    }
+
+    if (m_hasBegunWriting)
+    {
+        if (outHr) *outHr = S_OK;
+        return true;
+    }
+
+    const HRESULT hr = m_sinkWriter->BeginWriting();
+    if (FAILED(hr))
+    {
+        if (outHr) *outHr = hr;
+        return false;
+    }
+
+    m_hasBegunWriting = true;
     if (outHr) *outHr = S_OK;
     return true;
 }

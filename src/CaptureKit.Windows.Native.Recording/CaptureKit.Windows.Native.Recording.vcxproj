@@ -95,6 +95,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AudioRecorder.h" />
+    <ClInclude Include="RecorderExceptionGuard.h" />
     <ClInclude Include="ScreenRecorder.h" />
     <ClInclude Include="TextureConversionExports.h" />
   </ItemGroup>

@@ -43,6 +43,12 @@ public:
     /// Stop audio capture. Safe to call multiple times.
     /// </summary>
     void Stop();
+
+    /// <summary>
+    /// Stop capture and release every WASAPI interface. This must run on the
+    /// same thread that called Initialize/GetService.
+    /// </summary>
+    void Shutdown();
     
     /// <summary>
     /// Get the audio format (sample rate, channels, bit depth) of the capture device.
@@ -72,5 +78,4 @@ private:
     wil::com_ptr<IAudioCaptureClient> m_captureClient;
     wil::unique_cotaskmem_ptr<WAVEFORMATEX> m_waveFormat;
     bool m_isCapturing = false;
-    bool m_comInitialized = false;
 };

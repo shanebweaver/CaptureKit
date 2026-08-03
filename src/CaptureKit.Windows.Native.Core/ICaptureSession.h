@@ -73,12 +73,14 @@ public:
     /// Can be called at any time, even during recording.
     /// </summary>
     /// <param name="callback">Callback function to receive video frames, or nullptr to clear.</param>
-    virtual void SetVideoFrameCallback(VideoFrameCallback callback) = 0;
+    /// <returns>S_OK when the callback was updated; otherwise the failure HRESULT.</returns>
+    virtual HRESULT SetVideoFrameCallback(VideoFrameCallback callback) noexcept = 0;
 
     /// <summary>
     /// Set the callback to be invoked when an audio sample is ready.
     /// Can be called at any time, even during recording.
     /// </summary>
     /// <param name="callback">Callback function to receive audio samples, or nullptr to clear.</param>
-    virtual void SetAudioSampleCallback(AudioSampleCallback callback) = 0;
+    /// <returns>S_OK when the callback was updated; otherwise the failure HRESULT.</returns>
+    virtual HRESULT SetAudioSampleCallback(AudioSampleCallback callback) noexcept = 0;
 };

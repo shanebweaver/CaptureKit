@@ -1,6 +1,7 @@
 #pragma once
 #include "IMediaFoundationLifecycleManager.h"
 #include <atomic>
+#include <mutex>
 
 /// <summary>
 /// Manages Media Foundation initialization and shutdown with thread-safe reference counting.
@@ -28,4 +29,5 @@ private:
     
     // Global reference counter for MF lifecycle
     static std::atomic<int> s_refCount;
+    static std::mutex s_lifecycleMutex;
 };

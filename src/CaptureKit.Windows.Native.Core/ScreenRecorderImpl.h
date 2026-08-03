@@ -85,14 +85,16 @@ public:
     /// Callback is stored and automatically applied to new sessions.
     /// </summary>
     /// <param name="callback">Callback function to receive video frames.</param>
-    void SetVideoFrameCallback(VideoFrameCallback callback);
+    /// <returns>S_OK when the callback was updated; otherwise the failure HRESULT.</returns>
+    HRESULT SetVideoFrameCallback(VideoFrameCallback callback) noexcept;
 
     /// <summary>
     /// Set the callback to be invoked when an audio sample is ready.
     /// Callback is stored and automatically applied to new sessions.
     /// </summary>
     /// <param name="callback">Callback function to receive audio samples.</param>
-    void SetAudioSampleCallback(AudioSampleCallback callback);
+    /// <returns>S_OK when the callback was updated; otherwise the failure HRESULT.</returns>
+    HRESULT SetAudioSampleCallback(AudioSampleCallback callback) noexcept;
 
     /// <summary>
     /// Check if there is an active recording session.

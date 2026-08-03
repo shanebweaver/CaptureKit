@@ -3,6 +3,30 @@
 #include "SimpleMediaClockFactory.h"
 #include "WindowsLocalAudioCaptureSourceFactory.h"
 #include "WindowsWaveSinkWriterFactory.h"
+#include "NativeExceptionBoundary.h"
+
+namespace
+{
+    void StopAudioSessionBestEffort(
+        WindowsAudioCaptureSession* session,
+        const wchar_t* boundary) noexcept
+    {
+        if (!session)
+        {
+            return;
+        }
+
+        try
+        {
+            session->Stop();
+        }
+        catch (...)
+        {
+            const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+            CaptureKit::Native::ReportBoundaryException(boundary, hr);
+        }
+    }
+}
 
 AudioRecorderImpl::AudioRecorderImpl(std::unique_ptr<WindowsAudioCaptureSessionFactory> factory)
     : m_factory(std::move(factory))
@@ -19,7 +43,15 @@ AudioRecorderImpl::AudioRecorderImpl()
 
 AudioRecorderImpl::~AudioRecorderImpl()
 {
-    StopRecording();
+    try
+    {
+        StopRecording();
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(L"AudioRecorderImpl::~AudioRecorderImpl", hr);
+    }
 }
 
 bool AudioRecorderImpl::StartRecording(const AudioRecordingConfig& config, HRESULT* outHr)
@@ -32,16 +64,25 @@ bool AudioRecorderImpl::StartRecording(const AudioRecordingConfig& config, HRESU
         return false;
     }
 
-    auto session = m_factory->CreateSession(config);
+    HRESULT createHr = S_OK;
+    auto session = m_factory->CreateSession(config, &createHr);
     if (!session)
     {
-        if (outHr) *outHr = E_FAIL;
+        if (outHr) *outHr = FAILED(createHr) ? createHr : E_FAIL;
         return false;
     }
 
     if (m_audioSampleCallback)
     {
-        session->SetAudioSampleCallback(m_audioSampleCallback);
+        const HRESULT callbackHr = session->SetAudioSampleCallback(m_audioSampleCallback);
+        if (FAILED(callbackHr))
+        {
+            StopAudioSessionBestEffort(
+                session.get(),
+                L"AudioRecorderImpl::StartRecording callback rollback");
+            if (outHr) *outHr = callbackHr;
+            return false;
+        }
     }
 
     HRESULT hr = S_OK;
@@ -132,12 +173,29 @@ bool AudioRecorderImpl::SetAudioInputVolume(uint32_t volumePercentage)
     return true;
 }
 
-void AudioRecorderImpl::SetAudioSampleCallback(AudioSampleCallback callback)
+HRESULT AudioRecorderImpl::SetAudioSampleCallback(AudioSampleCallback callback) noexcept
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_audioSampleCallback = callback;
-    if (m_captureSession)
+    try
     {
-        m_captureSession->SetAudioSampleCallback(callback);
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_captureSession)
+        {
+            const HRESULT hr = m_captureSession->SetAudioSampleCallback(callback);
+            if (FAILED(hr))
+            {
+                return hr;
+            }
+        }
+
+        m_audioSampleCallback = callback;
+        return S_OK;
+    }
+    catch (...)
+    {
+        const HRESULT hr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"AudioRecorderImpl::SetAudioSampleCallback",
+            hr);
+        return hr;
     }
 }

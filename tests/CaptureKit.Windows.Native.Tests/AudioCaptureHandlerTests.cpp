@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "CppUnitTest.h"
+#include "AudioCaptureHandler.h"
 #include "WindowsLocalAudioCaptureSource.h"
 #include "SimpleMediaClock.h"
 
@@ -7,8 +8,72 @@
 #include <chrono>
 #include <atomic>
 #include <algorithm>
+#include <future>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
+class AudioCaptureHandlerTestAccess final
+{
+public:
+    static void PreparePendingInitialization(AudioCaptureHandler& handler)
+    {
+        std::lock_guard<std::mutex> lock(handler.m_stateMutex);
+        handler.m_initializeCompleted = false;
+        handler.m_initializeSucceeded = false;
+        handler.m_initializeResult = E_UNEXPECTED;
+        handler.m_shutdownRequested = false;
+    }
+
+    static bool WaitForInitialization(AudioCaptureHandler& handler, HRESULT* outHr)
+    {
+        return handler.WaitForInitialization(outHr);
+    }
+
+    static bool IsInitializationCompleted(AudioCaptureHandler& handler)
+    {
+        std::lock_guard<std::mutex> lock(handler.m_stateMutex);
+        return handler.m_initializeCompleted;
+    }
+
+    static void ForceInitializationCompletion(AudioCaptureHandler& handler)
+    {
+        {
+            std::lock_guard<std::mutex> lock(handler.m_stateMutex);
+            handler.m_initializeCompleted = true;
+            handler.m_initializeSucceeded = false;
+            handler.m_initializeResult = E_ABORT;
+        }
+        handler.m_stateChanged.notify_all();
+    }
+
+    static void PreparePendingThreadPublication(AudioCaptureHandler& handler)
+    {
+        std::lock_guard<std::mutex> lock(handler.m_stateMutex);
+        handler.m_initializeCompleted = false;
+        handler.m_initializeSucceeded = false;
+        handler.m_initializeResult = E_UNEXPECTED;
+        handler.m_shutdownRequested = false;
+        handler.m_threadCreationInProgress = true;
+    }
+
+    static bool WaitForShutdown(AudioCaptureHandler& handler)
+    {
+        std::unique_lock<std::mutex> lock(handler.m_stateMutex);
+        return handler.m_stateChanged.wait_for(
+            lock,
+            std::chrono::seconds(1),
+            [&handler] { return handler.m_shutdownRequested; });
+    }
+
+    static void CompleteThreadPublication(AudioCaptureHandler& handler)
+    {
+        {
+            std::lock_guard<std::mutex> lock(handler.m_stateMutex);
+            handler.m_threadCreationInProgress = false;
+        }
+        handler.m_stateChanged.notify_all();
+    }
+};
 
 namespace CaptureInteropTests
 {
@@ -77,6 +142,64 @@ namespace CaptureInteropTests
         };
 
     public:
+        TEST_METHOD(AudioHandler_StopCompletesPendingInitializationWait)
+        {
+            SimpleMediaClock clock;
+            AudioCaptureHandler handler(&clock);
+            AudioCaptureHandlerTestAccess::PreparePendingInitialization(handler);
+
+            auto initialization = std::async(std::launch::async, [&handler]() {
+                HRESULT hr = E_UNEXPECTED;
+                const bool initialized =
+                    AudioCaptureHandlerTestAccess::WaitForInitialization(handler, &hr);
+                return std::pair<bool, HRESULT>{ initialized, hr };
+            });
+
+            handler.Stop();
+            const auto status = initialization.wait_for(std::chrono::seconds(1));
+            if (status != std::future_status::ready)
+            {
+                // Keep a regression from stranding the test process itself.
+                AudioCaptureHandlerTestAccess::ForceInitializationCompletion(handler);
+            }
+
+            Assert::IsTrue(
+                status == std::future_status::ready,
+                L"Stop must release a pending initialization wait");
+            const auto [initialized, hr] = initialization.get();
+            Assert::IsFalse(initialized);
+            Assert::AreEqual(static_cast<long>(E_ABORT), static_cast<long>(hr));
+            Assert::IsTrue(
+                AudioCaptureHandlerTestAccess::IsInitializationCompleted(handler),
+                L"Stop must leave the terminal initialization state latched");
+        }
+
+        TEST_METHOD(AudioHandler_StopWaitsForPendingThreadPublication)
+        {
+            SimpleMediaClock clock;
+            AudioCaptureHandler handler(&clock);
+            AudioCaptureHandlerTestAccess::PreparePendingThreadPublication(handler);
+
+            auto stop = std::async(std::launch::async, [&handler]() {
+                handler.Stop();
+            });
+
+            Assert::IsTrue(
+                AudioCaptureHandlerTestAccess::WaitForShutdown(handler),
+                L"Stop did not publish shutdown");
+            Assert::IsTrue(
+                stop.wait_for(std::chrono::milliseconds(50)) ==
+                    std::future_status::timeout,
+                L"Stop returned before thread publication completed");
+
+            AudioCaptureHandlerTestAccess::CompleteThreadPublication(handler);
+            Assert::IsTrue(
+                stop.wait_for(std::chrono::seconds(1)) ==
+                    std::future_status::ready,
+                L"Stop did not continue after thread publication completed");
+            stop.get();
+        }
+
         TEST_METHOD(AudioSource_Initializes_WithValidLoopback)
         {
             SimpleMediaClock clock;
@@ -223,6 +346,46 @@ namespace CaptureInteropTests
             LONGLONG expectedMax = 60000000LL; // 6 seconds
             Assert::IsTrue(advancement >= expectedMin && advancement <= expectedMax,
                           L"Clock should advance approximately 5 seconds");
+        }
+
+        TEST_METHOD(AudioSource_DoesNotEmitSamplesWhileClockIsPaused)
+        {
+            SimpleMediaClock clock;
+            WindowsLocalAudioCaptureSource audioSource(&clock);
+            HRESULT hr;
+            if (!audioSource.Initialize(&hr))
+            {
+                Logger::WriteMessage("Skipping test - no audio device available");
+                return;
+            }
+
+            std::atomic<int> sampleCount{0};
+            audioSource.SetAudioSampleReadyCallback(
+                [&sampleCount](const AudioSampleReadyEventArgs&) { sampleCount++; });
+            LARGE_INTEGER qpc{};
+            QueryPerformanceCounter(&qpc);
+            clock.Start(qpc.QuadPart);
+            clock.SetClockAdvancer(&audioSource);
+            if (!audioSource.Start(&hr))
+            {
+                Logger::WriteMessage("Skipping test - failed to start audio capture");
+                return;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            clock.Pause();
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            const int pausedCount = sampleCount.load();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            const int laterPausedCount = sampleCount.load();
+
+            clock.Resume();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            const int resumedCount = sampleCount.load();
+            audioSource.Stop();
+
+            Assert::AreEqual(pausedCount, laterPausedCount);
+            Assert::IsTrue(resumedCount > laterPausedCount);
         }
 
         TEST_METHOD(AudioSource_MaintainsConsistentRate)

@@ -60,13 +60,13 @@ public:
     /// Set callback for video frame notifications.
     /// Thread-safe. Callback will not be invoked after Stop() returns.
     /// </summary>
-    void SetVideoFrameCallback(VideoFrameCallback callback);
+    HRESULT SetVideoFrameCallback(VideoFrameCallback callback) noexcept override;
 
     /// <summary>
     /// Set callback for audio sample notifications.
     /// Thread-safe. Callback will not be invoked after Stop() returns.
     /// </summary>
-    void SetAudioSampleCallback(AudioSampleCallback callback);
+    HRESULT SetAudioSampleCallback(AudioSampleCallback callback) noexcept override;
 
 private:
     // Helper methods

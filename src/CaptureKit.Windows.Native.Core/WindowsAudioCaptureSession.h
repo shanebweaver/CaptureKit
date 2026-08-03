@@ -31,7 +31,7 @@ public:
     void ToggleAudioCapture(bool enabled);
     bool SetAudioInputSource(const wchar_t* sourceId);
     void SetAudioInputVolume(uint32_t volumePercentage);
-    void SetAudioSampleCallback(AudioSampleCallback callback);
+    HRESULT SetAudioSampleCallback(AudioSampleCallback callback) noexcept;
 
 private:
     void SetupAudioCallback();

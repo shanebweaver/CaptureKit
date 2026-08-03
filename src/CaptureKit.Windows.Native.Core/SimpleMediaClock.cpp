@@ -9,6 +9,8 @@ SimpleMediaClock::SimpleMediaClock()
     , m_qpcFrequency(0)
     , m_isRunning(false)
     , m_isPaused(false)
+    , m_pauseStartQpc(0)
+    , m_accumulatedPausedQpc(0)
 {
     LARGE_INTEGER freq;
     QueryPerformanceFrequency(&freq);
@@ -31,19 +33,37 @@ LONGLONG SimpleMediaClock::GetStartTime() const
 
 LONGLONG SimpleMediaClock::GetRelativeTime(LONGLONG qpcTimestamp) const
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
     LONGLONG startQpc = m_startQpc.load();
     if (startQpc == 0)
     {
         return 0;
     }
 
-    LONGLONG qpcDelta = qpcTimestamp - startQpc;
+    LONGLONG effectiveQpc = qpcTimestamp;
+    if (m_isPaused.load() && m_pauseStartQpc != 0 && effectiveQpc > m_pauseStartQpc)
+    {
+        effectiveQpc = m_pauseStartQpc;
+    }
+
+    LONGLONG qpcDelta = effectiveQpc - startQpc - m_accumulatedPausedQpc;
+    if (qpcDelta <= 0)
+    {
+        return 0;
+    }
+
     return QpcToTicks(qpcDelta);
 }
 
 bool SimpleMediaClock::IsRunning() const
 {
     return m_isRunning.load();
+}
+
+bool SimpleMediaClock::IsPaused() const
+{
+    return m_isPaused.load();
 }
 
 LONGLONG SimpleMediaClock::GetQpcFrequency() const
@@ -63,6 +83,8 @@ void SimpleMediaClock::Start(LONGLONG startQpc)
     m_currentTime.store(0);
     m_isRunning.store(true);
     m_isPaused.store(false);
+    m_pauseStartQpc = 0;
+    m_accumulatedPausedQpc = 0;
 }
 
 void SimpleMediaClock::Reset()
@@ -73,6 +95,8 @@ void SimpleMediaClock::Reset()
     m_startQpc.store(0);
     m_isRunning.store(false);
     m_isPaused.store(false);
+    m_pauseStartQpc = 0;
+    m_accumulatedPausedQpc = 0;
 }
 
 void SimpleMediaClock::Pause()
@@ -81,6 +105,9 @@ void SimpleMediaClock::Pause()
     
     if (m_isRunning.load())
     {
+        LARGE_INTEGER qpc{};
+        QueryPerformanceCounter(&qpc);
+        m_pauseStartQpc = qpc.QuadPart;
         m_isPaused.store(true);
     }
 }
@@ -91,6 +118,13 @@ void SimpleMediaClock::Resume()
     
     if (m_isRunning.load() && m_isPaused.load())
     {
+        LARGE_INTEGER qpc{};
+        QueryPerformanceCounter(&qpc);
+        if (m_pauseStartQpc != 0 && qpc.QuadPart > m_pauseStartQpc)
+        {
+            m_accumulatedPausedQpc += qpc.QuadPart - m_pauseStartQpc;
+        }
+        m_pauseStartQpc = 0;
         m_isPaused.store(false);
     }
 }

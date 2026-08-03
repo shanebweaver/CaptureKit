@@ -222,6 +222,12 @@
     <ClInclude Include="Result.h">
       <Filter>Header Files\Results</Filter>
     </ClInclude>
+    <ClInclude Include="NativeExceptionBoundary.h">
+      <Filter>Header Files\Results</Filter>
+    </ClInclude>
+    <ClInclude Include="RecorderCallbackContext.h">
+      <Filter>Header Files\Results</Filter>
+    </ClInclude>
     <ClInclude Include="IScreenshotCapture.h">
       <Filter>Header Files\Screenshot</Filter>
     </ClInclude>

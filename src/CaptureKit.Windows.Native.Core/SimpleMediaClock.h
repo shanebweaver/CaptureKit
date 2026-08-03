@@ -43,6 +43,7 @@ public:
     LONGLONG GetStartTime() const override;
     LONGLONG GetRelativeTime(LONGLONG qpcTimestamp) const override;
     bool IsRunning() const override;
+    bool IsPaused() const override;
     LONGLONG GetQpcFrequency() const override;
 
     // IMediaClockController implementation
@@ -71,6 +72,10 @@ private:
 
     // Mutex for thread-safe state transitions
     mutable std::mutex m_mutex;
+
+    // QPC bookkeeping for the video-only fallback timeline. Guarded by m_mutex.
+    LONGLONG m_pauseStartQpc;
+    LONGLONG m_accumulatedPausedQpc;
 
     // Helper methods
     LONGLONG QpcToTicks(LONGLONG qpcDelta) const;

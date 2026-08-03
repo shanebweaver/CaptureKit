@@ -36,6 +36,9 @@
     <ClCompile Include="CallbackTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CaptureRecorderBoundaryTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="CaptureSessionIntegrationTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -43,6 +46,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FrameAdmissionControllerTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FrameArrivedHandlerTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="ResultTests.cpp">
@@ -55,6 +61,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="V1SmokeAcceptanceTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowsGraphicsCaptureSessionAudioTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RecorderCallbackContextTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

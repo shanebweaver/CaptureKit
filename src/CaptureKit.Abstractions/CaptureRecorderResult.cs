@@ -23,11 +23,6 @@ public readonly struct CaptureRecorderResult
             return;
         }
 
-        if (HResult != 0)
-        {
-            Marshal.ThrowExceptionForHR(HResult);
-        }
-
-        throw new InvalidOperationException($"Capture operation failed with status {Status}.");
+        throw new CaptureRecorderException(Status, HResult);
     }
 }

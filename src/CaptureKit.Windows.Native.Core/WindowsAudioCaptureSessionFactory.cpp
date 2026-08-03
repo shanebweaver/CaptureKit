@@ -13,16 +13,20 @@ WindowsAudioCaptureSessionFactory::WindowsAudioCaptureSessionFactory(
 {
 }
 
-std::unique_ptr<WindowsAudioCaptureSession> WindowsAudioCaptureSessionFactory::CreateSession(const AudioRecordingConfig& config)
+std::unique_ptr<WindowsAudioCaptureSession> WindowsAudioCaptureSessionFactory::CreateSession(
+    const AudioRecordingConfig& config,
+    HRESULT* outHr)
 {
     if (!config.IsValid())
     {
+        if (outHr) *outHr = E_INVALIDARG;
         return nullptr;
     }
 
     auto mediaClock = m_mediaClockFactory->CreateClock();
     if (!mediaClock)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -32,12 +36,14 @@ std::unique_ptr<WindowsAudioCaptureSession> WindowsAudioCaptureSessionFactory::C
         config.audioInputSourceId);
     if (!audioCaptureSource)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
     auto sinkWriter = m_wavSinkWriterFactory->CreateSinkWriter();
     if (!sinkWriter)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -57,8 +63,10 @@ std::unique_ptr<WindowsAudioCaptureSession> WindowsAudioCaptureSessionFactory::C
             L"[CaptureInterop Audio] CreateSession initialization failed. HRESULT=0x%08X\r\n",
             static_cast<unsigned int>(hr));
         OutputDebugStringW(message);
+        if (outHr) *outHr = hr;
         return nullptr;
     }
 
+    if (outHr) *outHr = S_OK;
     return session;
 }

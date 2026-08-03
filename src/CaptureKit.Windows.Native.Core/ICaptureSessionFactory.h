@@ -16,6 +16,9 @@ public:
     /// Create a new capture session instance with configuration.
     /// </summary>
     /// <param name="config">Configuration settings for the capture session.</param>
+    /// <param name="outHr">Optional pointer to receive the exact creation or initialization HRESULT.</param>
     /// <returns>A unique pointer to a new ICaptureSession implementation.</returns>
-    virtual std::unique_ptr<ICaptureSession> CreateSession(const CaptureSessionConfig& config) = 0;
+    virtual std::unique_ptr<ICaptureSession> CreateSession(
+        const CaptureSessionConfig& config,
+        HRESULT* outHr = nullptr) = 0;
 };

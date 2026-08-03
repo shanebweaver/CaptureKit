@@ -1,4 +1,6 @@
 using CaptureKit.Abstractions;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace CaptureKit.Windows;
 
@@ -10,12 +12,25 @@ public sealed class AudioCaptureService : IAudioCaptureService
 
 internal sealed class AudioCaptureSession : IAudioCaptureSession
 {
+    private static readonly ConcurrentBag<Delegate> FailedCallbackUnregistrationRoots = [];
+
+    private readonly IAudioCaptureNativeApi _nativeApi;
     private AudioSampleCallback? _audioSampleCallback;
     private bool _disposed;
 
     public AudioCaptureSession(AudioCaptureOptions options)
+        : this(options, new AudioCaptureNativeApi())
     {
+    }
+
+    internal AudioCaptureSession(
+        AudioCaptureOptions options,
+        IAudioCaptureNativeApi nativeApi)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(nativeApi);
         Options = options;
+        _nativeApi = nativeApi;
     }
 
     public event EventHandler<AudioSampleCapturedEventArgs>? SampleCaptured;
@@ -36,9 +51,9 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
 
         try
         {
-            NativeInterop.RegisterAudioRecordingSampleCallback(_audioSampleCallback).EnsureSuccess();
+            _nativeApi.RegisterAudioRecordingSampleCallback(_audioSampleCallback).EnsureSuccess();
             var nativeOptions = new NativeAudioCaptureOptions(Options);
-            NativeInterop.StartAudioRecording(in nativeOptions).EnsureSuccess();
+            _nativeApi.StartAudioRecording(in nativeOptions).EnsureSuccess();
             IsRecording = true;
         }
         catch
@@ -58,7 +73,7 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
 
         try
         {
-            NativeInterop.StopAudioRecording().EnsureSuccess();
+            _nativeApi.StopAudioRecording().EnsureSuccess();
             return new AudioCaptureResult(Options.OutputPath);
         }
         finally
@@ -79,7 +94,7 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
 
         try
         {
-            _ = NativeInterop.StopAudioRecording();
+            _ = _nativeApi.StopAudioRecording();
         }
         finally
         {
@@ -92,33 +107,33 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
     public void Pause()
     {
         ThrowIfDisposed();
-        NativeInterop.PauseAudioRecording().EnsureSuccess();
+        _nativeApi.PauseAudioRecording().EnsureSuccess();
         IsPaused = true;
     }
 
     public void Resume()
     {
         ThrowIfDisposed();
-        NativeInterop.ResumeAudioRecording().EnsureSuccess();
+        _nativeApi.ResumeAudioRecording().EnsureSuccess();
         IsPaused = false;
     }
 
     public void SetAudioCaptureEnabled(bool enabled)
     {
         ThrowIfDisposed();
-        NativeInterop.SetAudioRecordingEnabled(enabled ? 1u : 0u).EnsureSuccess();
+        _nativeApi.SetAudioRecordingEnabled(enabled ? 1u : 0u).EnsureSuccess();
     }
 
     public void SetAudioInputSource(string? sourceId)
     {
         ThrowIfDisposed();
-        NativeInterop.SetAudioRecordingInputSource(sourceId).EnsureSuccess();
+        _nativeApi.SetAudioRecordingInputSource(sourceId).EnsureSuccess();
     }
 
     public void SetAudioInputVolume(int volumePercentage)
     {
         ThrowIfDisposed();
-        NativeInterop.SetAudioRecordingInputVolume((uint)Math.Clamp(volumePercentage, 0, 100)).EnsureSuccess();
+        _nativeApi.SetAudioRecordingInputVolume((uint)Math.Clamp(volumePercentage, 0, 100)).EnsureSuccess();
     }
 
     public void Dispose()
@@ -139,8 +154,42 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
 
     private void ClearCallback()
     {
-        _ = NativeInterop.RegisterAudioRecordingSampleCallback(null);
-        _audioSampleCallback = null;
+        try
+        {
+            CaptureRecorderResult result = _nativeApi.RegisterAudioRecordingSampleCallback(null);
+            if (result.IsSuccess)
+            {
+                _audioSampleCallback = null;
+            }
+            else
+            {
+                RootFailedCallback(
+                    new CaptureRecorderException(result.Status, result.HResult));
+            }
+        }
+        catch (Exception exception)
+        {
+            RootFailedCallback(exception);
+        }
+    }
+
+    private void RootFailedCallback(Exception exception)
+    {
+        if (_audioSampleCallback is not null)
+        {
+            // Native code may still hold this delegate's function pointer. Keep it
+            // rooted when unregistering fails rather than risking a stale callback.
+            FailedCallbackUnregistrationRoots.Add(_audioSampleCallback);
+        }
+
+        try
+        {
+            Trace.TraceError($"CaptureKit audio callback unregister failed: {exception}");
+        }
+        catch
+        {
+            // Diagnostics must not interfere with cleanup.
+        }
     }
 
     private void ThrowIfDisposed()
@@ -150,4 +199,38 @@ internal sealed class AudioCaptureSession : IAudioCaptureSession
             throw new ObjectDisposedException(nameof(AudioCaptureSession));
         }
     }
+}
+
+internal interface IAudioCaptureNativeApi
+{
+    CaptureRecorderResult StartAudioRecording(in NativeAudioCaptureOptions options);
+    CaptureRecorderResult PauseAudioRecording();
+    CaptureRecorderResult ResumeAudioRecording();
+    CaptureRecorderResult StopAudioRecording();
+    CaptureRecorderResult SetAudioRecordingEnabled(uint enabled);
+    CaptureRecorderResult SetAudioRecordingInputSource(string? sourceId);
+    CaptureRecorderResult SetAudioRecordingInputVolume(uint volumePercentage);
+    CaptureRecorderResult RegisterAudioRecordingSampleCallback(AudioSampleCallback? callback);
+}
+
+internal sealed class AudioCaptureNativeApi : IAudioCaptureNativeApi
+{
+    public CaptureRecorderResult StartAudioRecording(in NativeAudioCaptureOptions options)
+        => NativeInterop.StartAudioRecording(in options);
+
+    public CaptureRecorderResult PauseAudioRecording() => NativeInterop.PauseAudioRecording();
+    public CaptureRecorderResult ResumeAudioRecording() => NativeInterop.ResumeAudioRecording();
+    public CaptureRecorderResult StopAudioRecording() => NativeInterop.StopAudioRecording();
+
+    public CaptureRecorderResult SetAudioRecordingEnabled(uint enabled)
+        => NativeInterop.SetAudioRecordingEnabled(enabled);
+
+    public CaptureRecorderResult SetAudioRecordingInputSource(string? sourceId)
+        => NativeInterop.SetAudioRecordingInputSource(sourceId);
+
+    public CaptureRecorderResult SetAudioRecordingInputVolume(uint volumePercentage)
+        => NativeInterop.SetAudioRecordingInputVolume(volumePercentage);
+
+    public CaptureRecorderResult RegisterAudioRecordingSampleCallback(AudioSampleCallback? callback)
+        => NativeInterop.RegisterAudioRecordingSampleCallback(callback);
 }

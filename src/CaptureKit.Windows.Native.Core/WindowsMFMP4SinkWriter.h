@@ -80,6 +80,7 @@ public:
         uint32_t sourceLeft = 0,
         uint32_t sourceTop = 0) override;
     bool InitializeAudioStream(WAVEFORMATEX* audioFormat, long* outHr = nullptr) override;
+    bool BeginWriting(long* outHr = nullptr) override;
     long WriteFrame(ID3D11Texture2D* texture, int64_t relativeTicks) override;
     long WriteAudioSample(std::span<const uint8_t> data, int64_t timestamp) override;
     void Finalize() override;

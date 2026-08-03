@@ -45,6 +45,15 @@ public:
     virtual bool InitializeAudioStream(WAVEFORMATEX* audioFormat, long* outHr = nullptr) = 0;
 
     /// <summary>
+    /// Commit the configured stream topology and start the Media Foundation writer.
+    /// This is idempotent and must succeed before capture sources are started so
+    /// encoder/topology failures are reported synchronously during startup.
+    /// </summary>
+    /// <param name="outHr">Optional pointer to receive the HRESULT error code.</param>
+    /// <returns>True if writing has begun, false otherwise.</returns>
+    virtual bool BeginWriting(long* outHr = nullptr) = 0;
+
+    /// <summary>
     /// Write a video frame to the MP4 file.
     /// </summary>
     /// <param name="texture">D3D11 texture containing the video frame.</param>

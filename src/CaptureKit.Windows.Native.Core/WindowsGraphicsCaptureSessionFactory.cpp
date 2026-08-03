@@ -16,11 +16,14 @@ WindowsGraphicsCaptureSessionFactory::WindowsGraphicsCaptureSessionFactory(
 {
 }
 
-std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSession(const CaptureSessionConfig& config)
+std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSession(
+    const CaptureSessionConfig& config,
+    HRESULT* outHr)
 {
     // Validate configuration first (Guard pattern)
     if (!config.IsValid())
     {
+        if (outHr) *outHr = E_INVALIDARG;
         return nullptr;
     }
 
@@ -28,6 +31,7 @@ std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSes
     auto mediaClock = m_mediaClockFactory->CreateClock();
     if (!mediaClock)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -38,6 +42,7 @@ std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSes
         config.audioInputSourceId);
     if (!audioCaptureSource)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -45,6 +50,7 @@ std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSes
     auto videoCaptureSource = m_videoCaptureSourceFactory->CreateVideoCaptureSource(config, mediaClock.get());
     if (!videoCaptureSource)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -52,6 +58,7 @@ std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSes
     auto sinkWriter = m_mp4SinkWriterFactory->CreateSinkWriter();
     if (!sinkWriter)
     {
+        if (outHr) *outHr = E_FAIL;
         return nullptr;
     }
 
@@ -75,8 +82,10 @@ std::unique_ptr<ICaptureSession> WindowsGraphicsCaptureSessionFactory::CreateSes
             L"[CaptureInterop V1] CreateSession initialization failed. HRESULT=0x%08X\r\n",
             static_cast<unsigned int>(hr));
         OutputDebugStringW(message);
+        if (outHr) *outHr = hr;
         return nullptr;
     }
 
+    if (outHr) *outHr = S_OK;
     return session;
 }

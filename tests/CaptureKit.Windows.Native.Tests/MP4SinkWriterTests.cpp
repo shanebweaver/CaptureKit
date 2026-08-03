@@ -141,6 +141,26 @@ namespace CaptureInteropTests
             DeleteFileW(tempPath);
         }
 
+        TEST_METHOD(BeginWriting_VideoOnly_SucceedsAndIsIdempotent)
+        {
+            auto device = CreateTestDevice();
+            WindowsMFMP4SinkWriter writer;
+
+            wchar_t tempPath[MAX_PATH];
+            GetTempPathW(MAX_PATH, tempPath);
+            wcscat_s(tempPath, L"test_begin_writing.mp4");
+
+            HRESULT hr = E_FAIL;
+            Assert::IsTrue(writer.Initialize(tempPath, device.get(), 1280, 720, &hr));
+            Assert::IsTrue(writer.BeginWriting(&hr));
+            Assert::AreEqual(S_OK, hr);
+            Assert::IsTrue(writer.BeginWriting(&hr));
+            Assert::AreEqual(S_OK, hr);
+
+            writer.Finalize();
+            DeleteFileW(tempPath);
+        }
+
         TEST_METHOD(InitializeAudioStream_WithNullFormat_Fails)
         {
             auto device = CreateTestDevice();

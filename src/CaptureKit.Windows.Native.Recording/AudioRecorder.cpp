@@ -1,8 +1,19 @@
 #include "AudioRecorder.h"
 #include "AudioRecorderImpl.h"
+#include "RecorderExceptionGuard.h"
 #include <Windows.h>
+#include <mutex>
 
-static AudioRecorderImpl g_audioRecorder;
+namespace
+{
+    std::mutex g_audioRecorderMutex;
+
+    AudioRecorderImpl& GetAudioRecorder()
+    {
+        static AudioRecorderImpl recorder;
+        return recorder;
+    }
+}
 
 static CaptureRecorderResult AudioRecorderResult(CaptureRecorderStatus status, HRESULT hr)
 {
@@ -23,71 +34,92 @@ extern "C"
 {
     __declspec(dllexport) CaptureRecorderResult StartAudioRecording(const AudioRecordingOptions* options)
     {
-        if (!options || !options->outputPath)
-        {
-            return AudioRecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
-        }
+        return GuardRecorderCall(
+            L"StartAudioRecording",
+            CaptureRecorderStatus::StartFailed,
+            [&]() -> CaptureRecorderResult {
+                std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+                if (!options || !options->outputPath)
+                {
+                    return AudioRecorderResult(CaptureRecorderStatus::InvalidArgument, E_INVALIDARG);
+                }
 
-        AudioRecordingConfig config(
-            options->outputPath,
-            options->captureAudio != 0,
-            options->audioInputSourceId ? options->audioInputSourceId : L"",
-            options->audioInputVolumePercentage);
+                AudioRecordingConfig config(
+                    options->outputPath,
+                    options->captureAudio != 0,
+                    options->audioInputSourceId ? options->audioInputSourceId : L"",
+                    options->audioInputVolumePercentage);
 
-        HRESULT hr = S_OK;
-        if (!g_audioRecorder.StartRecording(config, &hr))
-        {
-            return AudioRecorderResult(hr == E_INVALIDARG ? CaptureRecorderStatus::InvalidArgument : CaptureRecorderStatus::StartFailed, hr);
-        }
+                HRESULT hr = S_OK;
+                if (!GetAudioRecorder().StartRecording(config, &hr))
+                {
+                    return AudioRecorderResult(
+                        hr == E_INVALIDARG
+                            ? CaptureRecorderStatus::InvalidArgument
+                            : CaptureRecorderStatus::StartFailed,
+                        hr);
+                }
 
-        return AudioSuccess();
+                return AudioSuccess();
+            });
     }
 
     __declspec(dllexport) CaptureRecorderResult PauseAudioRecording()
     {
-        return g_audioRecorder.PauseRecording()
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"PauseAudioRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().PauseRecording() ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult ResumeAudioRecording()
     {
-        return g_audioRecorder.ResumeRecording()
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"ResumeAudioRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().ResumeRecording() ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult StopAudioRecording()
     {
-        return g_audioRecorder.StopRecording()
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"StopAudioRecording", CaptureRecorderStatus::InvalidState, [] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().StopRecording() ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetAudioRecordingEnabled(uint32_t enabled)
     {
-        return g_audioRecorder.SetAudioCaptureEnabled(enabled != 0)
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"SetAudioRecordingEnabled", CaptureRecorderStatus::InvalidState, [enabled] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().SetAudioCaptureEnabled(enabled != 0) ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetAudioRecordingInputSource(const wchar_t* sourceId)
     {
-        return g_audioRecorder.SetAudioInputSource(sourceId ? sourceId : L"")
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"SetAudioRecordingInputSource", CaptureRecorderStatus::InvalidState, [sourceId] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().SetAudioInputSource(sourceId ? sourceId : L"") ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult SetAudioRecordingInputVolume(uint32_t volumePercentage)
     {
-        return g_audioRecorder.SetAudioInputVolume(volumePercentage)
-            ? AudioSuccess()
-            : AudioNoActiveSession();
+        return GuardRecorderCall(L"SetAudioRecordingInputVolume", CaptureRecorderStatus::InvalidState, [volumePercentage] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            return GetAudioRecorder().SetAudioInputVolume(volumePercentage) ? AudioSuccess() : AudioNoActiveSession();
+        });
     }
 
     __declspec(dllexport) CaptureRecorderResult RegisterAudioRecordingSampleCallback(AudioSampleCallback callback)
     {
-        g_audioRecorder.SetAudioSampleCallback(callback);
-        return AudioSuccess();
+        return GuardRecorderCall(L"RegisterAudioRecordingSampleCallback", CaptureRecorderStatus::InvalidState, [callback] {
+            std::lock_guard<std::mutex> lock(g_audioRecorderMutex);
+            const HRESULT hr = GetAudioRecorder().SetAudioSampleCallback(callback);
+            return SUCCEEDED(hr)
+                ? AudioSuccess()
+                : AudioRecorderResult(CaptureRecorderStatus::InvalidState, hr);
+        });
     }
 }

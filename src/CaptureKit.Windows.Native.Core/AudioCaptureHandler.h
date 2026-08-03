@@ -4,13 +4,16 @@
 #include <thread>
 #include <atomic>
 #include <vector>
+#include <condition_variable>
 #include <mmreg.h>
 #include <Windows.h>
 #include <mutex>
+#include <string>
 
 // Forward declarations
 class IMediaClockWriter;
 class IMediaClockReader;
+class AudioCaptureHandlerTestAccess;
 
 /// <summary>
 /// Event arguments for audio sample ready event.
@@ -59,7 +62,7 @@ public:
     bool SetInputDevice(bool loopback, const wchar_t* deviceId = nullptr, HRESULT* outHr = nullptr);
     
     /// <summary>
-    /// Start the audio capture thread.
+    /// Start the already-initialized WASAPI stream on its owner thread.
     /// </summary>
     /// <param name="outHr">Optional pointer to receive the HRESULT error code.</param>
     /// <returns>True if capture started successfully, false otherwise.</returns>
@@ -118,12 +121,17 @@ public:
     bool IsRunning() const { return m_isRunning; }
 
 private:
+    friend class AudioCaptureHandlerTestAccess;
+
     /// <summary>
     /// Audio capture thread procedure.
     /// Runs at ABOVE_NORMAL priority to ensure responsive capture without starving UI.
     /// Uses the media clock reader to get synchronized timestamps.
     /// </summary>
-    void CaptureThreadProc();
+    void CaptureThreadProc() noexcept;
+    void RunCaptureLoop() noexcept;
+    bool WaitForInitialization(HRESULT* outHr);
+    void JoinCaptureThread();
     
     /// <summary>
     /// Thread-safe helper to get silent audio buffer of required size. 
@@ -151,4 +159,20 @@ private:
     UINT32 m_sampleRate = 0;                    // Cached sample rate from audio format
     std::atomic<uint32_t> m_volumePercentage{100};
     LARGE_INTEGER m_qpcFrequency{};             // QPC frequency for time calculations
+
+    std::mutex m_stateMutex;
+    std::condition_variable m_stateChanged;
+    std::mutex m_initializeCallMutex;
+    std::mutex m_captureThreadMutex;
+    std::wstring m_deviceId;
+    bool m_loopback = false;
+    bool m_initializeCompleted = false;
+    bool m_initializeSucceeded = false;
+    bool m_startRequested = false;
+    bool m_startCompleted = false;
+    bool m_startSucceeded = false;
+    bool m_shutdownRequested = false;
+    bool m_threadCreationInProgress = false;
+    HRESULT m_initializeResult = E_UNEXPECTED;
+    HRESULT m_startResult = E_UNEXPECTED;
 };

@@ -1,10 +1,46 @@
 #include "pch.h"
 #include "WindowsDesktopVideoCaptureSource.h"
+#include "CaptureDimensionPolicy.h"
 #include "FrameArrivedHandler.h"
 #include "WindowsGraphicsCaptureHelpers.h"
 #include <strsafe.h>
 
 using namespace WindowsGraphicsCaptureHelpers;
+
+namespace
+{
+    class ThreadRoInitialization final
+    {
+    public:
+        explicit ThreadRoInitialization(RO_INIT_TYPE initializationType) noexcept
+            : m_result(RoInitialize(initializationType))
+            , m_mustUninitialize(SUCCEEDED(m_result))
+        {
+        }
+
+        ~ThreadRoInitialization() noexcept
+        {
+            if (m_mustUninitialize)
+            {
+                RoUninitialize();
+            }
+        }
+
+        HRESULT Result() const noexcept { return m_result; }
+
+    private:
+        HRESULT m_result;
+        bool m_mustUninitialize;
+    };
+
+    ThreadRoInitialization& GetThreadRoInitialization() noexcept
+    {
+        // Keep the apartment initialized for the lifetime of this control thread.
+        // The thread-local destructor balances RoInitialize on the same thread.
+        thread_local ThreadRoInitialization initialization(RO_INIT_MULTITHREADED);
+        return initialization;
+    }
+}
 
 WindowsDesktopVideoCaptureSource::WindowsDesktopVideoCaptureSource(const CaptureSessionConfig& config, IMediaClockReader* clockReader)
     : m_config(config)
@@ -34,18 +70,13 @@ bool WindowsDesktopVideoCaptureSource::Initialize(HRESULT* outHr)
 {
     HRESULT hr = S_OK;
 
-    if (!m_roInitialized)
+    // WinRT apartment initialization is thread-affine. Retain a balanced
+    // thread-local apartment instead of uninitializing it from a later Stop thread.
+    hr = GetThreadRoInitialization().Result();
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
     {
-        hr = RoInitialize(RO_INIT_MULTITHREADED);
-        if (FAILED(hr) && hr != RPC_E_CHANGED_MODE)
-        {
-            if (outHr) *outHr = hr;
-            return false;
-        }
-        if (SUCCEEDED(hr))
-        {
-            m_roInitialized = true;
-        }
+        if (outHr) *outHr = hr;
+        return false;
     }
 
     // Get the graphics capture item
@@ -121,20 +152,47 @@ bool WindowsDesktopVideoCaptureSource::Initialize(HRESULT* outHr)
             m_config.sourceTop < 0 ||
             m_config.sourceWidth == 0 ||
             m_config.sourceHeight == 0 ||
-            static_cast<uint32_t>(m_config.sourceLeft) + m_config.sourceWidth > static_cast<uint32_t>(size.Width) ||
-            static_cast<uint32_t>(m_config.sourceTop) + m_config.sourceHeight > static_cast<uint32_t>(size.Height))
+            m_config.sourceLeft >= size.Width ||
+            m_config.sourceTop >= size.Height)
         {
             if (outHr) *outHr = E_INVALIDARG;
             return false;
         }
 
-        m_width = m_config.sourceWidth;
-        m_height = m_config.sourceHeight;
+        const uint32_t availableWidth = static_cast<uint32_t>(size.Width - m_config.sourceLeft);
+        const uint32_t availableHeight = static_cast<uint32_t>(size.Height - m_config.sourceTop);
+        NormalizedCaptureDimensions dimensions{};
+        if (!TryNormalizeCaptureDimensions(
+                m_config.sourceWidth,
+                m_config.sourceHeight,
+                availableWidth,
+                availableHeight,
+                &dimensions))
+        {
+            if (outHr) *outHr = E_INVALIDARG;
+            return false;
+        }
+
+        m_width = dimensions.width;
+        m_height = dimensions.height;
     }
     else
     {
-        m_width = size.Width;
-        m_height = size.Height;
+        NormalizedCaptureDimensions dimensions{};
+        if (size.Width <= 0 || size.Height <= 0 ||
+            !TryNormalizeCaptureDimensions(
+                static_cast<uint32_t>(size.Width),
+                static_cast<uint32_t>(size.Height),
+                static_cast<uint32_t>(size.Width),
+                static_cast<uint32_t>(size.Height),
+                &dimensions))
+        {
+            if (outHr) *outHr = E_INVALIDARG;
+            return false;
+        }
+
+        m_width = dimensions.width;
+        m_height = dimensions.height;
     }
 
     if (outHr) *outHr = S_OK;
@@ -227,6 +285,10 @@ void WindowsDesktopVideoCaptureSource::Stop()
 
 void WindowsDesktopVideoCaptureSource::ReleaseResources()
 {
+    // Stop may be dispatched on a different control thread from Initialize.
+    // Ensure that thread has a valid apartment before closing WinRT objects.
+    (void)GetThreadRoInitialization();
+
     if (m_captureSession)
     {
         // Explicitly close the session via IClosable before releasing the reference.
@@ -266,9 +328,4 @@ void WindowsDesktopVideoCaptureSource::ReleaseResources()
     m_context.reset();
     m_device.reset();
 
-    if (m_roInitialized)
-    {
-        RoUninitialize();
-        m_roInitialized = false;
-    }
 }

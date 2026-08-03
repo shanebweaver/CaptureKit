@@ -254,7 +254,13 @@ if (-not $SkipPack) {
     )
 
     if (-not $SkipNative) {
-        $packageFilePattern = 'CaptureKit.Windows.1.0.0.nupkg'
+        [xml] $versionProps = Get-Content -LiteralPath (Join-Path $repoRoot 'Directory.Version.props')
+        $packageVersion = [string] $versionProps.Project.PropertyGroup.CaptureKitVersion
+        if ([string]::IsNullOrWhiteSpace($packageVersion)) {
+            throw 'Could not read CaptureKitVersion from Directory.Version.props.'
+        }
+
+        $packageFilePattern = "CaptureKit.Windows.$packageVersion.nupkg"
         $captureKitPackage = Get-ChildItem -LiteralPath $packageOutput -File -Filter $packageFilePattern |
             Sort-Object -Property LastWriteTimeUtc -Descending |
             Select-Object -First 1

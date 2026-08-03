@@ -97,6 +97,8 @@
     <ClInclude Include="CallbackRegistry.h" />
     <ClInclude Include="CallbackTypes.h" />
     <ClInclude Include="CaptureSessionConfig.h" />
+    <ClInclude Include="CaptureDimensionPolicy.h" />
+    <ClInclude Include="RecorderCallbackContext.h" />
     <ClInclude Include="CaptureSessionState.h" />
     <ClInclude Include="CompositeAudioCaptureSource.h" />
     <ClInclude Include="ErrorInfo.h" />
@@ -131,6 +133,7 @@
     <ClInclude Include="MediaFoundationLifecycleManager.h" />
     <ClInclude Include="MediaFoundationLifecycleManagerFactory.h" />
     <ClInclude Include="MediaTimeConstants.h" />
+    <ClInclude Include="NativeExceptionBoundary.h" />
     <ClInclude Include="Result.h" />
     <ClInclude Include="SampleBuilder.h" />
     <ClInclude Include="SampleBuilderFactory.h" />

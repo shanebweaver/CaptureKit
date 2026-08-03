@@ -45,12 +45,14 @@ struct QueuedFrame
 /// </summary>
 class FrameArrivedHandler final
     : public ITypedEventHandler<Direct3D11CaptureFramePool*, IInspectable*>
+    , public IAgileObject
 {
 public:
     explicit FrameArrivedHandler(VideoFrameReadyCallback callback, IMediaClockReader* clockReader) noexcept;
     ~FrameArrivedHandler();
 
-    // IUnknown
+    // IUnknown / IAgileObject. CreateFreeThreaded requires event handlers that
+    // can be invoked without apartment-affine marshaling.
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override;
     ULONG STDMETHODCALLTYPE AddRef() override;
     ULONG STDMETHODCALLTYPE Release() override;
@@ -59,7 +61,7 @@ public:
     HRESULT STDMETHODCALLTYPE Invoke(IDirect3D11CaptureFramePool* sender, IInspectable* args) noexcept override;
 
     // Start the background processing thread (called after construction)
-    void StartProcessing();
+    bool StartProcessing(HRESULT* outHr = nullptr) noexcept;
 
     // Stop the background processing thread
     void Stop();
@@ -70,7 +72,7 @@ public:
     uint64_t GetReceivedFrameCount() const { return m_receivedFrameCount.load(); }
 
 private:
-    void ProcessingThreadProc();
+    void ProcessingThreadProc() noexcept;
     LONGLONG GetFrameTimestamp() const;
 
     volatile long m_ref;
