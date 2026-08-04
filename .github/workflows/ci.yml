@@ -7,6 +7,9 @@ on:
       - 'codex/**'
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-test-pack:
     runs-on: windows-latest
@@ -34,3 +37,63 @@ jobs:
         with:
           name: CaptureKit.Windows
           path: artifacts/packages/*.nupkg
+
+  publish:
+    name: Publish NuGet packages
+    needs: build-test-pack
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: nuget.org
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v6
+        with:
+          name: CaptureKit.Windows
+          path: packages
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Log in to NuGet
+        id: nuget_login
+        uses: NuGet/login@v1
+        with:
+          user: shanebweaver
+
+      - name: Publish NuGet packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'NuGet trusted publishing did not provide a temporary API key.'
+          }
+
+          $packages = @(Get-ChildItem -LiteralPath packages -Filter '*.nupkg' -File | Sort-Object Name)
+          if ($packages.Count -ne 2) {
+            throw "Expected exactly two NuGet packages, but found $($packages.Count)."
+          }
+
+          $expectedPackageIds = @('CaptureKit.Abstractions', 'CaptureKit.Windows')
+          foreach ($packageId in $expectedPackageIds) {
+            if (@($packages | Where-Object Name -Like "$packageId.*.nupkg").Count -ne 1) {
+              throw "Expected exactly one package for $packageId."
+            }
+          }
+
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName `
+              --source 'https://api.nuget.org/v3/index.json' `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to publish $($package.Name)."
+            }
+          }
