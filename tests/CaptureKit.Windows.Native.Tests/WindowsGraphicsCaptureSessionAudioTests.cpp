@@ -27,6 +27,8 @@ namespace CaptureInteropTests
             int stopCalls = 0;
             int setClockWriterCalls = 0;
             int setCallbackCalls = 0;
+            uint32_t inputVolumePercentage = 100;
+            uint32_t systemVolumePercentage = 100;
             bool enabled = true;
             bool running = false;
         };
@@ -87,7 +89,15 @@ namespace CaptureInteropTests
                 return m_state->enabled;
             }
 
-            void SetVolume(uint32_t) override {}
+            void SetVolume(uint32_t volumePercentage) override
+            {
+                m_state->inputVolumePercentage = volumePercentage;
+            }
+
+            void SetSystemVolume(uint32_t volumePercentage) override
+            {
+                m_state->systemVolumePercentage = volumePercentage;
+            }
 
             bool IsRunning() const override
             {
@@ -283,25 +293,38 @@ namespace CaptureInteropTests
         }
 
     public:
-        TEST_METHOD(VideoOnly_DoesNotInitializeOrStartAudioOrAddAac)
+        TEST_METHOD(InitiallyMutedAudio_InitializesPipelineAndCanEnableDuringCapture)
         {
             auto audio = std::make_shared<AudioState>();
             auto video = std::make_shared<VideoState>();
             auto sink = std::make_shared<SinkState>();
-            auto session = CreateSession(CreateConfig(false), audio, video, sink);
+            auto config = CreateConfig(false);
+            config.audioInputVolumePercentage = 37;
+            config.systemAudioVolumePercentage = 42;
+            auto session = CreateSession(config, audio, video, sink);
 
             HRESULT hr = S_OK;
             Assert::IsTrue(session->Initialize(&hr));
             Assert::IsTrue(session->Start(&hr));
 
-            Assert::AreEqual(0, audio->setClockWriterCalls);
-            Assert::AreEqual(0, audio->initializeCalls);
-            Assert::AreEqual(0, audio->startCalls);
-            Assert::AreEqual(0, sink->initializeAudioCalls);
+            Assert::AreEqual(1, audio->setClockWriterCalls);
+            Assert::AreEqual(1, audio->initializeCalls);
+            Assert::AreEqual(1, audio->startCalls);
+            Assert::IsFalse(audio->enabled, L"Desktop audio must honor its initial muted state");
+            Assert::AreEqual(37u, audio->inputVolumePercentage);
+            Assert::AreEqual(42u, audio->systemVolumePercentage);
+            Assert::AreEqual(1, sink->initializeAudioCalls);
             Assert::AreEqual(1, sink->initializeCalls);
             Assert::AreEqual(1, sink->beginWritingCalls);
             Assert::AreEqual(1, sink->writeFrameCalls);
 
+            session->ToggleAudioCapture(true);
+            session->SetSystemAudioVolume(64);
+            session->SetAudioInputVolume(58);
+
+            Assert::IsTrue(audio->enabled, L"Desktop audio must support false-to-true transitions");
+            Assert::AreEqual(64u, audio->systemVolumePercentage, L"Desktop audio volume must remain mutable");
+            Assert::AreEqual(58u, audio->inputVolumePercentage, L"Microphone volume must remain independent");
             session->Stop();
         }
 

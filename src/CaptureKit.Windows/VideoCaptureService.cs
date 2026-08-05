@@ -178,6 +178,13 @@ internal sealed class VideoCaptureSession : IVideoCaptureSession
         _nativeApi.SetScreenRecordingAudioEnabled(enabled ? 1u : 0u).EnsureSuccess();
     }
 
+    public void SetSystemAudioVolume(int volumePercentage)
+    {
+        ThrowIfDisposed();
+        ThrowIfInsideNativeCallback();
+        _nativeApi.SetScreenRecordingSystemAudioVolume((uint)Math.Clamp(volumePercentage, 0, 100)).EnsureSuccess();
+    }
+
     public void SetAudioInputSource(string? sourceId)
     {
         ThrowIfDisposed();
@@ -411,6 +418,7 @@ internal interface IVideoCaptureNativeApi
     CaptureRecorderResult ResumeScreenRecording();
     CaptureRecorderResult StopScreenRecording();
     CaptureRecorderResult SetScreenRecordingAudioEnabled(uint enabled);
+    CaptureRecorderResult SetScreenRecordingSystemAudioVolume(uint volumePercentage);
     CaptureRecorderResult SetScreenRecordingAudioInputSource(string? sourceId);
     CaptureRecorderResult SetScreenRecordingAudioInputVolume(uint volumePercentage);
     CaptureRecorderResult RegisterVideoFrameCallback(VideoFrameCallback? callback);
@@ -428,6 +436,9 @@ internal sealed class VideoCaptureNativeApi : IVideoCaptureNativeApi
 
     public CaptureRecorderResult SetScreenRecordingAudioEnabled(uint enabled)
         => NativeInterop.SetScreenRecordingAudioEnabled(enabled);
+
+    public CaptureRecorderResult SetScreenRecordingSystemAudioVolume(uint volumePercentage)
+        => NativeInterop.SetScreenRecordingSystemAudioVolume(volumePercentage);
 
     public CaptureRecorderResult SetScreenRecordingAudioInputSource(string? sourceId)
         => NativeInterop.SetScreenRecordingAudioInputSource(sourceId);

@@ -27,6 +27,7 @@ public:
     void SetEnabled(bool enabled) override;
     bool IsEnabled() const override;
     void SetVolume(uint32_t volumePercentage) override;
+    void SetSystemVolume(uint32_t volumePercentage) override;
     bool IsRunning() const override;
     bool SetInputDeviceId(const wchar_t* sourceId, HRESULT* outHr = nullptr) override;
     void SetClockWriter(IMediaClockWriter* clockWriter) override;

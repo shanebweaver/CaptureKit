@@ -290,9 +290,9 @@ namespace CaptureInteropTests
             Assert::IsTrue(foundError, L"Should have error about audioBitrate being too high");
         }
         
-        TEST_METHOD(Validate_AudioBitrateInvalid_WithAudioDisabled_NoError)
+        TEST_METHOD(Validate_AudioBitrateInvalid_WhenInitiallyMuted_ReturnsError)
         {
-            // Arrange - audio disabled with invalid bitrate
+            // Arrange - initially muted audio still provisions an AAC stream
             HMONITOR hMonitor = reinterpret_cast<HMONITOR>(0x12345678);
             CaptureSessionConfig config(hMonitor, L"C:\\test\\output.mp4", false, 30, 5'000'000, 16'000);  // 16 kbps
             
@@ -300,9 +300,8 @@ namespace CaptureInteropTests
             ConfigValidationResult result = config.Validate();
             
             // Assert
-            Assert::IsTrue(result.isValid, L"Configuration should be valid when audio is disabled");
+            Assert::IsFalse(result.isValid, L"The always-prepared audio stream requires a valid bitrate");
             
-            // Should not have audio bitrate errors when audio is disabled
             bool foundAudioBitrateError = false;
             for (const auto& error : result.errors)
             {
@@ -312,7 +311,7 @@ namespace CaptureInteropTests
                     break;
                 }
             }
-            Assert::IsFalse(foundAudioBitrateError, L"Should not have audioBitrate error when audio is disabled");
+            Assert::IsTrue(foundAudioBitrateError, L"Should have an audioBitrate error while initially muted");
         }
         
         TEST_METHOD(Validate_MultipleErrors_ReturnsAllErrors)

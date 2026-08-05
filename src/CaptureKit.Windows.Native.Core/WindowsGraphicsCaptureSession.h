@@ -49,6 +49,7 @@ public:
     void Pause() override;
     void Resume() override;
     void ToggleAudioCapture(bool enabled) override;
+    void SetSystemAudioVolume(uint32_t volumePercentage) override;
     bool SetAudioInputSource(const wchar_t* sourceId) override;
     void SetAudioInputVolume(uint32_t volumePercentage) override;
     bool IsActive() const override { return m_stateMachine.IsActive(); }

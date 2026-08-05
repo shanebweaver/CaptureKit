@@ -434,6 +434,17 @@ void CompositeAudioCaptureSource::SetVolume(uint32_t volumePercentage)
     }
 }
 
+void CompositeAudioCaptureSource::SetSystemVolume(uint32_t volumePercentage)
+{
+    uint32_t clampedVolume = std::min<uint32_t>(volumePercentage, 100);
+
+    std::lock_guard<std::mutex> lock(m_sourceMutex);
+    if (m_loopbackSource)
+    {
+        m_loopbackSource->SetVolume(clampedVolume);
+    }
+}
+
 bool CompositeAudioCaptureSource::IsRunning() const
 {
     return m_isRunning.load();

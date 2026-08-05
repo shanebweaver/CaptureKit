@@ -63,7 +63,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->systemAudioVolumePercentage);
                     break;
 
                 case CaptureRecordingTargetKind::Window:
@@ -79,7 +80,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->systemAudioVolumePercentage);
                     break;
 
                 case CaptureRecordingTargetKind::Rectangle:
@@ -99,7 +101,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->systemAudioVolumePercentage);
                     break;
 
                 default:
@@ -151,6 +154,14 @@ extern "C"
         return GuardRecorderCall(L"SetScreenRecordingAudioEnabled", CaptureRecorderStatus::InvalidState, [enabled] {
             std::lock_guard<std::mutex> lock(g_recorderMutex);
             return GetRecorder().SetAudioCaptureEnabled(enabled != 0) ? Success() : NoActiveSession();
+        });
+    }
+
+    __declspec(dllexport) CaptureRecorderResult SetScreenRecordingSystemAudioVolume(uint32_t volumePercentage)
+    {
+        return GuardRecorderCall(L"SetScreenRecordingSystemAudioVolume", CaptureRecorderStatus::InvalidState, [volumePercentage] {
+            std::lock_guard<std::mutex> lock(g_recorderMutex);
+            return GetRecorder().SetSystemAudioVolume(volumePercentage) ? Success() : NoActiveSession();
         });
     }
 

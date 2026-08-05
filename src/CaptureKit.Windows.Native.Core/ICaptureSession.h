@@ -51,6 +51,11 @@ public:
     virtual void ToggleAudioCapture(bool enabled) = 0;
 
     /// <summary>
+    /// Set the system/desktop audio volume percentage for the active recording.
+    /// </summary>
+    virtual void SetSystemAudioVolume(uint32_t volumePercentage) = 0;
+
+    /// <summary>
     /// Change the audio input source for the active recording.
     /// </summary>
     /// <param name="sourceId">Audio endpoint id, or an empty string for the default source.</param>

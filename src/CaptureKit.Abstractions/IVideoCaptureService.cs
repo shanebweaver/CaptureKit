@@ -21,6 +21,7 @@ public interface IVideoCaptureSession : IDisposable
     void Pause();
     void Resume();
     void SetAudioCaptureEnabled(bool enabled);
+    void SetSystemAudioVolume(int volumePercentage);
     void SetAudioInputSource(string? sourceId);
     void SetAudioInputVolume(int volumePercentage);
 }
