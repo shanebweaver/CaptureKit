@@ -190,6 +190,17 @@ bool ScreenRecorderImpl::SetAudioCaptureEnabled(bool enabled)
     return true;
 }
 
+bool ScreenRecorderImpl::SetSystemAudioVolume(uint32_t volumePercentage)
+{
+    if (!HasActiveSession() || !m_captureSession->IsActive())
+    {
+        return false;
+    }
+
+    m_captureSession->SetSystemAudioVolume(volumePercentage);
+    return true;
+}
+
 bool ScreenRecorderImpl::SetAudioInputSource(const wchar_t* sourceId)
 {
     if (!HasActiveSession() || !m_captureSession->IsActive())

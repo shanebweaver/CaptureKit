@@ -23,6 +23,9 @@ internal static partial class NativeInterop
     [DllImport(RecordingNativeLibraryName)]
     internal static extern CaptureRecorderResult SetScreenRecordingAudioEnabled(uint enabled);
 
+    [DllImport(RecordingNativeLibraryName)]
+    internal static extern CaptureRecorderResult SetScreenRecordingSystemAudioVolume(uint volumePercentage);
+
     [DllImport(RecordingNativeLibraryName, CharSet = CharSet.Unicode)]
     internal static extern CaptureRecorderResult SetScreenRecordingAudioInputSource(string? sourceId);
 
@@ -132,6 +135,7 @@ internal readonly struct NativeVideoCaptureOptions
         AudioBitrate = options.AudioBitrate;
         AudioInputSourceId = options.AudioInputSourceId;
         AudioInputVolumePercentage = (uint)Math.Clamp(options.AudioInputVolumePercentage, 0, 100);
+        SystemAudioVolumePercentage = (uint)Math.Clamp(options.SystemAudioVolumePercentage, 0, 100);
     }
 
     public readonly CaptureTargetKind TargetKind;
@@ -154,6 +158,7 @@ internal readonly struct NativeVideoCaptureOptions
     public readonly string? AudioInputSourceId;
 
     public readonly uint AudioInputVolumePercentage;
+    public readonly uint SystemAudioVolumePercentage;
 }
 
 [StructLayout(LayoutKind.Sequential)]

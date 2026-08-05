@@ -73,6 +73,7 @@ namespace CaptureInteropTests
             void Pause() override {}
             void Resume() override {}
             void ToggleAudioCapture(bool) override {}
+            void SetSystemAudioVolume(uint32_t) override {}
             bool SetAudioInputSource(const wchar_t*) override { return true; }
             void SetAudioInputVolume(uint32_t) override {}
             bool IsActive() const override { return m_active; }

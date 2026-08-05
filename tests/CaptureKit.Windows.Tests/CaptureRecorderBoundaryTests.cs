@@ -32,6 +32,35 @@ public sealed class CaptureRecorderBoundaryTests
     }
 
     [TestMethod]
+    public void NativeVideoOptions_KeepSystemAndInputVolumesIndependent()
+    {
+        var options = new VideoCaptureOptions(
+            CaptureTarget.Monitor((nint)1),
+            "capture.mp4",
+            AudioInputVolumePercentage: 37,
+            SystemAudioVolumePercentage: 64);
+
+        var nativeOptions = new NativeVideoCaptureOptions(options);
+
+        nativeOptions.AudioInputVolumePercentage.Should().Be(37u);
+        nativeOptions.SystemAudioVolumePercentage.Should().Be(64u);
+    }
+
+    [TestMethod]
+    public void SetSystemAudioVolume_ClampsAndUsesDedicatedNativeControl()
+    {
+        var nativeApi = new TrackingNativeApi();
+        using var session = new VideoCaptureSession(
+            new VideoCaptureOptions(CaptureTarget.Monitor((nint)1), "capture.mp4"),
+            new StubSupportService(VideoCaptureSupportResult.Supported()),
+            nativeApi);
+
+        session.SetSystemAudioVolume(164);
+
+        nativeApi.LastSystemAudioVolumePercentage.Should().Be(100u);
+    }
+
+    [TestMethod]
     public void AudioSample_DoesNotReportRecordingStarted()
     {
         using var session = CreateSession();
@@ -208,6 +237,7 @@ public sealed class CaptureRecorderBoundaryTests
         public bool FailCallbackUnregistration { get; set; }
         public bool HasVideoCallback => _videoCallback is not null;
         public bool HasAudioCallback => _audioCallback is not null;
+        public uint? LastSystemAudioVolumePercentage { get; private set; }
 
         public CaptureRecorderResult StartScreenRecording(in NativeVideoCaptureOptions options) => Called();
         public CaptureRecorderResult PauseScreenRecording() => Called();
@@ -218,6 +248,11 @@ public sealed class CaptureRecorderBoundaryTests
             return Called();
         }
         public CaptureRecorderResult SetScreenRecordingAudioEnabled(uint enabled) => Called();
+        public CaptureRecorderResult SetScreenRecordingSystemAudioVolume(uint volumePercentage)
+        {
+            LastSystemAudioVolumePercentage = volumePercentage;
+            return Called();
+        }
         public CaptureRecorderResult SetScreenRecordingAudioInputSource(string? sourceId) => Called();
         public CaptureRecorderResult SetScreenRecordingAudioInputVolume(uint volumePercentage) => Called();
         public CaptureRecorderResult RegisterVideoFrameCallback(VideoFrameCallback? callback)

@@ -420,6 +420,7 @@ bool WindowsGraphicsCaptureSession::StartAudioCapture(HRESULT* outHr)
     
     // Apply audio enabled setting
     m_audioCaptureSource->SetEnabled(m_config.audioEnabled);
+    m_audioCaptureSource->SetSystemVolume(m_config.systemAudioVolumePercentage);
     m_audioCaptureSource->SetVolume(m_config.audioInputVolumePercentage);
     
     // Start audio
@@ -554,6 +555,14 @@ void WindowsGraphicsCaptureSession::ToggleAudioCapture(bool enabled)
     if (m_audioCaptureSource && m_audioCaptureSource->IsRunning())
     {
         m_audioCaptureSource->SetEnabled(enabled);
+    }
+}
+
+void WindowsGraphicsCaptureSession::SetSystemAudioVolume(uint32_t volumePercentage)
+{
+    if (m_audioCaptureSource)
+    {
+        m_audioCaptureSource->SetSystemVolume(volumePercentage);
     }
 }
 

@@ -85,6 +85,15 @@ public:
     virtual void SetVolume(uint32_t volumePercentage) = 0;
 
     /// <summary>
+    /// Set the system/desktop volume independently from microphone/input volume.
+    /// Standalone sources treat this as their normal volume control.
+    /// </summary>
+    virtual void SetSystemVolume(uint32_t volumePercentage)
+    {
+        SetVolume(volumePercentage);
+    }
+
+    /// <summary>
     /// Check if the audio input source is currently running.
     /// </summary>
     /// <returns>True if capture is active, false otherwise.</returns>

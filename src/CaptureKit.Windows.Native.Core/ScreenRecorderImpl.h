@@ -71,6 +71,11 @@ public:
     bool SetAudioCaptureEnabled(bool enabled);
 
     /// <summary>
+    /// Set system/desktop audio volume during recording.
+    /// </summary>
+    bool SetSystemAudioVolume(uint32_t volumePercentage);
+
+    /// <summary>
     /// Change the audio input source during recording.
     /// </summary>
     bool SetAudioInputSource(const wchar_t* sourceId);
