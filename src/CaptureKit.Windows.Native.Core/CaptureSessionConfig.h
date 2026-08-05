@@ -348,16 +348,12 @@ struct CaptureSessionConfig
         constexpr uint32_t MIN_AUDIO_BITRATE = 32'000;    // 32 kbps
         constexpr uint32_t MAX_AUDIO_BITRATE = 320'000;   // 320 kbps
         
-        if (audioEnabled)
+        if (audioBitrate < MIN_AUDIO_BITRATE || audioBitrate > MAX_AUDIO_BITRATE)
         {
-            if (audioBitrate < MIN_AUDIO_BITRATE || audioBitrate > MAX_AUDIO_BITRATE)
-            {
-                result.AddError("audioBitrate must be between " + 
-                              std::to_string(MIN_AUDIO_BITRATE) + " and " + 
-                              std::to_string(MAX_AUDIO_BITRATE) + " (got " +
-                              std::to_string(audioBitrate) + ")");
-            }
-
+            result.AddError("audioBitrate must be between " +
+                          std::to_string(MIN_AUDIO_BITRATE) + " and " +
+                          std::to_string(MAX_AUDIO_BITRATE) + " (got " +
+                          std::to_string(audioBitrate) + ")");
         }
 
         if (audioInputVolumePercentage > 100)
