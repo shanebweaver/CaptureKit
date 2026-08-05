@@ -27,6 +27,7 @@ namespace CaptureInteropTests
             int stopCalls = 0;
             int setClockWriterCalls = 0;
             int setCallbackCalls = 0;
+            uint32_t volumePercentage = 100;
             bool enabled = true;
             bool running = false;
         };
@@ -87,7 +88,10 @@ namespace CaptureInteropTests
                 return m_state->enabled;
             }
 
-            void SetVolume(uint32_t) override {}
+            void SetVolume(uint32_t volumePercentage) override
+            {
+                m_state->volumePercentage = volumePercentage;
+            }
 
             bool IsRunning() const override
             {
@@ -258,17 +262,13 @@ namespace CaptureInteropTests
             std::shared_ptr<SinkState> m_state;
         };
 
-        static CaptureSessionConfig CreateConfig(
-            bool desktopAudio,
-            std::wstring inputSourceId = L"",
-            bool prepareAudioPipeline = false)
+        static CaptureSessionConfig CreateConfig(bool desktopAudio, std::wstring inputSourceId = L"")
         {
             CaptureSessionConfig config(
                 reinterpret_cast<HMONITOR>(static_cast<uintptr_t>(1)),
                 L"C:\\capturekit-optional-audio-test.mp4",
                 desktopAudio);
             config.audioInputSourceId = std::move(inputSourceId);
-            config.prepareAudioPipeline = prepareAudioPipeline;
             return config;
         }
 
@@ -287,25 +287,34 @@ namespace CaptureInteropTests
         }
 
     public:
-        TEST_METHOD(VideoOnly_DoesNotInitializeOrStartAudioOrAddAac)
+        TEST_METHOD(InitiallyMutedAudio_InitializesPipelineAndCanEnableDuringCapture)
         {
             auto audio = std::make_shared<AudioState>();
             auto video = std::make_shared<VideoState>();
             auto sink = std::make_shared<SinkState>();
-            auto session = CreateSession(CreateConfig(false), audio, video, sink);
+            auto config = CreateConfig(false);
+            config.audioInputVolumePercentage = 37;
+            auto session = CreateSession(config, audio, video, sink);
 
             HRESULT hr = S_OK;
             Assert::IsTrue(session->Initialize(&hr));
             Assert::IsTrue(session->Start(&hr));
 
-            Assert::AreEqual(0, audio->setClockWriterCalls);
-            Assert::AreEqual(0, audio->initializeCalls);
-            Assert::AreEqual(0, audio->startCalls);
-            Assert::AreEqual(0, sink->initializeAudioCalls);
+            Assert::AreEqual(1, audio->setClockWriterCalls);
+            Assert::AreEqual(1, audio->initializeCalls);
+            Assert::AreEqual(1, audio->startCalls);
+            Assert::IsFalse(audio->enabled, L"Desktop audio must honor its initial muted state");
+            Assert::AreEqual(37u, audio->volumePercentage);
+            Assert::AreEqual(1, sink->initializeAudioCalls);
             Assert::AreEqual(1, sink->initializeCalls);
             Assert::AreEqual(1, sink->beginWritingCalls);
             Assert::AreEqual(1, sink->writeFrameCalls);
 
+            session->ToggleAudioCapture(true);
+            session->SetAudioInputVolume(64);
+
+            Assert::IsTrue(audio->enabled, L"Desktop audio must support false-to-true transitions");
+            Assert::AreEqual(64u, audio->volumePercentage, L"Desktop audio volume must remain mutable");
             session->Stop();
         }
 
@@ -345,28 +354,6 @@ namespace CaptureInteropTests
             Assert::AreEqual(1, sink->initializeAudioCalls);
             Assert::AreEqual(1, sink->initializeCalls);
 
-            session->Stop();
-        }
-
-        TEST_METHOD(PreparedMutedAudio_CanEnableDuringActiveRecording)
-        {
-            auto audio = std::make_shared<AudioState>();
-            auto video = std::make_shared<VideoState>();
-            auto sink = std::make_shared<SinkState>();
-            auto session = CreateSession(CreateConfig(false, L"", true), audio, video, sink);
-
-            HRESULT hr = S_OK;
-            Assert::IsTrue(session->Initialize(&hr));
-            Assert::IsTrue(session->Start(&hr));
-
-            Assert::AreEqual(1, audio->initializeCalls);
-            Assert::AreEqual(1, audio->startCalls);
-            Assert::IsFalse(audio->enabled, L"Prepared desktop audio must start muted");
-            Assert::AreEqual(1, sink->initializeAudioCalls);
-
-            session->ToggleAudioCapture(true);
-
-            Assert::IsTrue(audio->enabled, L"Prepared desktop audio must support false-to-true transitions");
             session->Stop();
         }
 

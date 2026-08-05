@@ -98,10 +98,6 @@ WindowsGraphicsCaptureSession::~WindowsGraphicsCaptureSession()
 bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
 {
     HRESULT hr = S_OK;
-    const bool audioRequested =
-        m_config.prepareAudioPipeline ||
-        m_config.audioEnabled ||
-        !m_config.audioInputSourceId.empty();
 
     // Validate state - must be in Created state to initialize
     if (m_stateMachine.GetState() != CaptureSessionState::Created)
@@ -117,10 +113,8 @@ bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
     }
 
     // Validate dependencies
-    if (!m_mediaClock || !m_videoCaptureSource || !m_sinkWriter || (audioRequested && !m_audioCaptureSource))
+    if (!m_mediaClock || !m_audioCaptureSource || !m_videoCaptureSource || !m_sinkWriter)
     {
-        // Audio is intentionally optional for a video-only session. All other dependencies,
-        // plus audio when requested, must be supplied by the factory.
         [[maybe_unused]] bool transitioned = m_stateMachine.TryTransitionTo(CaptureSessionState::Failed);
         // Transition should always succeed from Created to Failed
         assert(transitioned && "Transition to Failed should always succeed from Created state");
@@ -138,23 +132,20 @@ bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
     }
 
     m_audioAvailable = false;
-    if (audioRequested)
-    {
-        // Audio is the preferred media-clock advancer when it was explicitly requested.
-        // A video-only session must not touch WASAPI or add an AAC stream.
-        m_mediaClock->SetClockAdvancer(m_audioCaptureSource.get());
+    // Every video session prepares audio so mute, unmute, source, and volume controls
+    // remain live for the entire recording. audioEnabled is only the initial mute state.
+    m_mediaClock->SetClockAdvancer(m_audioCaptureSource.get());
 
-        if (m_audioCaptureSource->Initialize(&hr) && m_audioCaptureSource->GetFormat())
-        {
-            m_audioAvailable = true;
-        }
-        else
-        {
-            OutputDebugStringW(L"[CaptureInterop V1] Audio source initialization failed; continuing with video-only timing fallback.\r\n");
-            m_audioCaptureSource->SetAudioSampleReadyCallback(nullptr);
-            m_audioCaptureSource->Stop();
-            m_audioCaptureSource.reset();
-        }
+    if (m_audioCaptureSource->Initialize(&hr) && m_audioCaptureSource->GetFormat())
+    {
+        m_audioAvailable = true;
+    }
+    else
+    {
+        OutputDebugStringW(L"[CaptureInterop V1] Audio source initialization failed; continuing with video-only timing fallback.\r\n");
+        m_audioCaptureSource->SetAudioSampleReadyCallback(nullptr);
+        m_audioCaptureSource->Stop();
+        m_audioCaptureSource.reset();
     }
 
     // Initialize sink writer

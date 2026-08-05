@@ -32,21 +32,6 @@ public sealed class CaptureRecorderBoundaryTests
     }
 
     [TestMethod]
-    public void NativeVideoOptions_PreservePreparedAudioPipelineRequest()
-    {
-        var options = new VideoCaptureOptions(
-            CaptureTarget.Monitor((nint)1),
-            "capture.mp4",
-            CaptureAudio: false,
-            PrepareAudioPipeline: true);
-
-        var nativeOptions = new NativeVideoCaptureOptions(options);
-
-        nativeOptions.CaptureAudio.Should().Be(0u);
-        nativeOptions.PrepareAudioPipeline.Should().Be(1u);
-    }
-
-    [TestMethod]
     public void AudioSample_DoesNotReportRecordingStarted()
     {
         using var session = CreateSession();

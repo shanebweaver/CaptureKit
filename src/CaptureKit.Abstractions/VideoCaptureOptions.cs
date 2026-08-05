@@ -8,5 +8,4 @@ public sealed record VideoCaptureOptions(
     uint VideoBitrate = 5_000_000,
     uint AudioBitrate = 128_000,
     string? AudioInputSourceId = null,
-    int AudioInputVolumePercentage = 100,
-    bool PrepareAudioPipeline = false);
+    int AudioInputVolumePercentage = 100);

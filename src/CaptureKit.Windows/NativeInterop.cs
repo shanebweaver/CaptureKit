@@ -132,7 +132,6 @@ internal readonly struct NativeVideoCaptureOptions
         AudioBitrate = options.AudioBitrate;
         AudioInputSourceId = options.AudioInputSourceId;
         AudioInputVolumePercentage = (uint)Math.Clamp(options.AudioInputVolumePercentage, 0, 100);
-        PrepareAudioPipeline = options.PrepareAudioPipeline ? 1u : 0u;
     }
 
     public readonly CaptureTargetKind TargetKind;
@@ -155,7 +154,6 @@ internal readonly struct NativeVideoCaptureOptions
     public readonly string? AudioInputSourceId;
 
     public readonly uint AudioInputVolumePercentage;
-    public readonly uint PrepareAudioPipeline;
 }
 
 [StructLayout(LayoutKind.Sequential)]
