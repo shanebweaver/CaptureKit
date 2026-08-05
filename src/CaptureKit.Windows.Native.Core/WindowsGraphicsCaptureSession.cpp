@@ -98,7 +98,10 @@ WindowsGraphicsCaptureSession::~WindowsGraphicsCaptureSession()
 bool WindowsGraphicsCaptureSession::Initialize(HRESULT* outHr)
 {
     HRESULT hr = S_OK;
-    const bool audioRequested = m_config.audioEnabled || !m_config.audioInputSourceId.empty();
+    const bool audioRequested =
+        m_config.prepareAudioPipeline ||
+        m_config.audioEnabled ||
+        !m_config.audioInputSourceId.empty();
 
     // Validate state - must be in Created state to initialize
     if (m_stateMachine.GetState() != CaptureSessionState::Created)

@@ -258,13 +258,17 @@ namespace CaptureInteropTests
             std::shared_ptr<SinkState> m_state;
         };
 
-        static CaptureSessionConfig CreateConfig(bool desktopAudio, std::wstring inputSourceId = L"")
+        static CaptureSessionConfig CreateConfig(
+            bool desktopAudio,
+            std::wstring inputSourceId = L"",
+            bool prepareAudioPipeline = false)
         {
             CaptureSessionConfig config(
                 reinterpret_cast<HMONITOR>(static_cast<uintptr_t>(1)),
                 L"C:\\capturekit-optional-audio-test.mp4",
                 desktopAudio);
             config.audioInputSourceId = std::move(inputSourceId);
+            config.prepareAudioPipeline = prepareAudioPipeline;
             return config;
         }
 
@@ -341,6 +345,28 @@ namespace CaptureInteropTests
             Assert::AreEqual(1, sink->initializeAudioCalls);
             Assert::AreEqual(1, sink->initializeCalls);
 
+            session->Stop();
+        }
+
+        TEST_METHOD(PreparedMutedAudio_CanEnableDuringActiveRecording)
+        {
+            auto audio = std::make_shared<AudioState>();
+            auto video = std::make_shared<VideoState>();
+            auto sink = std::make_shared<SinkState>();
+            auto session = CreateSession(CreateConfig(false, L"", true), audio, video, sink);
+
+            HRESULT hr = S_OK;
+            Assert::IsTrue(session->Initialize(&hr));
+            Assert::IsTrue(session->Start(&hr));
+
+            Assert::AreEqual(1, audio->initializeCalls);
+            Assert::AreEqual(1, audio->startCalls);
+            Assert::IsFalse(audio->enabled, L"Prepared desktop audio must start muted");
+            Assert::AreEqual(1, sink->initializeAudioCalls);
+
+            session->ToggleAudioCapture(true);
+
+            Assert::IsTrue(audio->enabled, L"Prepared desktop audio must support false-to-true transitions");
             session->Stop();
         }
 

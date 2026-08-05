@@ -63,7 +63,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->prepareAudioPipeline != 0);
                     break;
 
                 case CaptureRecordingTargetKind::Window:
@@ -79,7 +80,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->prepareAudioPipeline != 0);
                     break;
 
                 case CaptureRecordingTargetKind::Rectangle:
@@ -99,7 +101,8 @@ extern "C"
                         options->videoBitrate,
                         options->audioBitrate,
                         options->audioInputSourceId ? options->audioInputSourceId : L"",
-                        options->audioInputVolumePercentage);
+                        options->audioInputVolumePercentage,
+                        options->prepareAudioPipeline != 0);
                     break;
 
                 default:

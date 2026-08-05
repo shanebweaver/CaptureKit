@@ -41,6 +41,7 @@ struct CaptureRecordingOptions
     uint32_t audioBitrate;
     const wchar_t* audioInputSourceId;
     uint32_t audioInputVolumePercentage;
+    uint32_t prepareAudioPipeline;
 };
 
 extern "C"

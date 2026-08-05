@@ -97,6 +97,12 @@ struct CaptureSessionConfig
     bool audioEnabled;
 
     /// <summary>
+    /// Whether to initialize an initially muted audio pipeline so live audio
+    /// controls can enable a source later in the same recording.
+    /// </summary>
+    bool prepareAudioPipeline;
+
+    /// <summary>
     /// Optional Windows audio input endpoint id. Empty uses the existing default audio source.
     /// </summary>
     std::wstring audioInputSourceId;
@@ -132,7 +138,8 @@ struct CaptureSessionConfig
         uint32_t vidBitrate = 5'000'000,
         uint32_t audBitrate = 128'000,
         std::wstring audioSourceId = L"",
-        uint32_t audioVolumePercentage = 100)
+        uint32_t audioVolumePercentage = 100,
+        bool prepareAudio = false)
         : targetType(CaptureTargetType::Monitor)
         , hMonitor(monitor)
         , hwnd(nullptr)
@@ -142,6 +149,7 @@ struct CaptureSessionConfig
         , sourceHeight(0)
         , outputPath(path ? path : L"")
         , audioEnabled(audio)
+        , prepareAudioPipeline(prepareAudio)
         , frameRate(fps)
         , videoBitrate(vidBitrate)
         , audioBitrate(audBitrate)
@@ -161,7 +169,8 @@ struct CaptureSessionConfig
         uint32_t vidBitrate = 5'000'000,
         uint32_t audBitrate = 128'000,
         std::wstring audioSourceId = L"",
-        uint32_t audioVolumePercentage = 100)
+        uint32_t audioVolumePercentage = 100,
+        bool prepareAudio = false)
         : targetType(CaptureTargetType::Monitor)
         , hMonitor(monitor)
         , hwnd(nullptr)
@@ -171,6 +180,7 @@ struct CaptureSessionConfig
         , sourceHeight(0)
         , outputPath(std::move(path))
         , audioEnabled(audio)
+        , prepareAudioPipeline(prepareAudio)
         , frameRate(fps)
         , videoBitrate(vidBitrate)
         , audioBitrate(audBitrate)
@@ -192,6 +202,7 @@ struct CaptureSessionConfig
         , sourceHeight(0)
         , outputPath(L"")
         , audioEnabled(false)
+        , prepareAudioPipeline(false)
         , frameRate(30)
         , videoBitrate(5'000'000)
         , audioBitrate(128'000)
@@ -208,9 +219,10 @@ struct CaptureSessionConfig
         uint32_t vidBitrate = 5'000'000,
         uint32_t audBitrate = 128'000,
         std::wstring audioSourceId = L"",
-        uint32_t audioVolumePercentage = 100)
+        uint32_t audioVolumePercentage = 100,
+        bool prepareAudio = false)
     {
-        CaptureSessionConfig config(monitor, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage);
+        CaptureSessionConfig config(monitor, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage, prepareAudio);
         config.targetType = CaptureTargetType::Monitor;
         return config;
     }
@@ -223,9 +235,10 @@ struct CaptureSessionConfig
         uint32_t vidBitrate = 5'000'000,
         uint32_t audBitrate = 128'000,
         std::wstring audioSourceId = L"",
-        uint32_t audioVolumePercentage = 100)
+        uint32_t audioVolumePercentage = 100,
+        bool prepareAudio = false)
     {
-        CaptureSessionConfig config(nullptr, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage);
+        CaptureSessionConfig config(nullptr, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage, prepareAudio);
         config.targetType = CaptureTargetType::Window;
         config.hwnd = window;
         return config;
@@ -243,9 +256,10 @@ struct CaptureSessionConfig
         uint32_t vidBitrate = 5'000'000,
         uint32_t audBitrate = 128'000,
         std::wstring audioSourceId = L"",
-        uint32_t audioVolumePercentage = 100)
+        uint32_t audioVolumePercentage = 100,
+        bool prepareAudio = false)
     {
-        CaptureSessionConfig config(monitor, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage);
+        CaptureSessionConfig config(monitor, std::move(path), audio, fps, vidBitrate, audBitrate, std::move(audioSourceId), audioVolumePercentage, prepareAudio);
         config.targetType = CaptureTargetType::Rectangle;
         config.sourceLeft = left;
         config.sourceTop = top;
