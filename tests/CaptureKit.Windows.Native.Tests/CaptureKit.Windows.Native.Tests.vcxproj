@@ -114,6 +114,10 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="ResultTests.cpp" />
+    <ClCompile Include="ScreenshotSafetyTests.cpp" />
+    <ClCompile Include="..\..\src\CaptureKit.Windows.Native.Recording\ScreenshotExports.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="ShutdownRaceConditionTests.cpp" />
     <ClCompile Include="V1SmokeAcceptanceTests.cpp" />
     <ClCompile Include="VideoCaptureSourceStopTests.cpp" />

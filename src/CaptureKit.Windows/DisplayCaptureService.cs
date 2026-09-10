@@ -185,22 +185,44 @@ public sealed class DisplayCaptureService : IDisplayCaptureService
 
     private static Bitmap CreateBitmap(byte[] pixelBuffer, int width, int height)
     {
-        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        BitmapData data = bitmap.LockBits(
-            new Rectangle(0, 0, width, height),
-            ImageLockMode.WriteOnly,
-            PixelFormat.Format32bppArgb);
+        ArgumentNullException.ThrowIfNull(pixelBuffer);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
 
+        long pixelCount = (long)width * height;
+        if (pixelCount > int.MaxValue / 4 || pixelBuffer.LongLength != pixelCount * 4)
+        {
+            throw new ArgumentException("Pixel buffer must match the BGRA image dimensions.", nameof(pixelBuffer));
+        }
+
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         try
         {
-            Marshal.Copy(pixelBuffer, 0, data.Scan0, pixelBuffer.Length);
-        }
-        finally
-        {
-            bitmap.UnlockBits(data);
-        }
+            BitmapData data = bitmap.LockBits(
+                new Rectangle(0, 0, width, height),
+                ImageLockMode.WriteOnly,
+                PixelFormat.Format32bppArgb);
 
-        return bitmap;
+            try
+            {
+                int rowBytes = width * 4;
+                for (int y = 0; y < height; ++y)
+                {
+                    Marshal.Copy(pixelBuffer, y * rowBytes, data.Scan0 + y * data.Stride, rowBytes);
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(data);
+            }
+
+            return bitmap;
+        }
+        catch
+        {
+            bitmap.Dispose();
+            throw;
+        }
     }
 
     private static bool TryGetExtendedFrameBounds(nint windowHandle, out NativeRect rect)

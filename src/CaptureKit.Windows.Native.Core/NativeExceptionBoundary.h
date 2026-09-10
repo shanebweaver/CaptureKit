@@ -6,6 +6,8 @@
 
 #include <new>
 #include <system_error>
+#include <type_traits>
+#include <utility>
 
 namespace CaptureKit::Native
 {
@@ -56,6 +58,22 @@ namespace CaptureKit::Native
             static_cast<unsigned int>(hr))))
         {
             OutputDebugStringW(message);
+        }
+    }
+
+    // Use scalar failure results so reporting an allocation failure cannot itself allocate.
+    template<typename TResult, typename TAction>
+    TResult GuardNativeCall(const wchar_t* boundary, TResult failureResult, TAction&& action) noexcept
+    {
+        static_assert(std::is_scalar_v<TResult>);
+        try
+        {
+            return std::forward<TAction>(action)();
+        }
+        catch (...)
+        {
+            ReportBoundaryException(boundary, HResultFromCurrentException());
+            return failureResult;
         }
     }
 }

@@ -90,6 +90,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\CaptureKit.Windows.Native.Recording\ScreenshotExports.h" />
+    <ClInclude Include="..\CaptureKit.Windows.Native.Recording\ScreenshotHandle.h" />
     <ClInclude Include="..\CaptureKit.Windows.Native.Core\WindowsScreenshotCapture.h" />
   </ItemGroup>
   <ItemGroup>

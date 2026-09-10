@@ -1,8 +1,10 @@
 #include "pch.h"
 #include "WindowsScreenshotCapture.h"
+#include "NativeExceptionBoundary.h"
 #include <wincodec.h>
 #include <ShellScalingApi.h>
 #include <algorithm>
+#include <limits>
 
 #pragma comment(lib, "Shcore.lib")
 #pragma comment(lib, "Windowscodecs.lib")
@@ -137,20 +139,30 @@ Result<std::vector<uint8_t>> WindowsScreenshotCapture::GetBitmapPixels(HDC hdc, 
     return Result<std::vector<uint8_t>>::Ok(std::move(pixels));
 }
 
-BOOL CALLBACK WindowsScreenshotCapture::EnumMonitorCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM lParam)
+BOOL CALLBACK WindowsScreenshotCapture::EnumMonitorCallback(HMONITOR hMonitor, HDC, LPRECT, LPARAM lParam) noexcept
 {
     auto* pContext = reinterpret_cast<EnumContext*>(lParam);
-    
-    auto result = pContext->pThis->CaptureMonitor(hMonitor);
-    if (result.IsError())
+    try
     {
-        // Store error and stop enumeration
-        *pContext->pError = result.Error();
+        auto result = pContext->pThis->CaptureMonitor(hMonitor);
+        if (result.IsError())
+        {
+            *pContext->pError = result.Error();
+            return FALSE;
+        }
+    
+        pContext->pResults->push_back(std::move(result.Value()));
+        return TRUE;
+    }
+    catch (...)
+    {
+        // ErrorInfo owns strings. Save only the HRESULT here so this path is
+        // safe even when allocating the screenshot or error message failed.
+        pContext->exceptionHr = CaptureKit::Native::HResultFromCurrentException();
+        CaptureKit::Native::ReportBoundaryException(
+            L"WindowsScreenshotCapture::EnumMonitorCallback", pContext->exceptionHr);
         return FALSE;
     }
-    
-    pContext->pResults->push_back(std::move(result.Value()));
-    return TRUE;
 }
 
 Result<std::vector<MonitorScreenshot>> WindowsScreenshotCapture::CaptureAllMonitors()
@@ -165,6 +177,12 @@ Result<std::vector<MonitorScreenshot>> WindowsScreenshotCapture::CaptureAllMonit
     
     if (!EnumDisplayMonitors(nullptr, nullptr, EnumMonitorCallback, reinterpret_cast<LPARAM>(&context)))
     {
+        if (FAILED(context.exceptionHr))
+        {
+            return Result<std::vector<MonitorScreenshot>>::Error(
+                ErrorInfo::FromHResult(context.exceptionHr, "EnumMonitorCallback"));
+        }
+
         if (!error.IsSuccess())
         {
             return Result<std::vector<MonitorScreenshot>>::Error(error);
@@ -185,41 +203,69 @@ Result<std::vector<MonitorScreenshot>> WindowsScreenshotCapture::CaptureAllMonit
 
 Result<CombinedScreenshot> WindowsScreenshotCapture::CombineMonitors(const std::vector<MonitorScreenshot>& monitors)
 {
+    std::vector<const MonitorScreenshot*> views;
+    views.reserve(monitors.size());
+    for (const auto& monitor : monitors)
+    {
+        views.push_back(&monitor);
+    }
+    return CombineMonitorViews(views);
+}
+
+Result<CombinedScreenshot> WindowsScreenshotCapture::CombineMonitorViews(std::span<const MonitorScreenshot* const> monitors)
+{
     if (monitors.empty())
     {
         return Result<CombinedScreenshot>::Error(
             ErrorInfo::FromMessage(E_INVALIDARG, "No monitors to combine", "CombineMonitors"));
     }
     
-    // Calculate union bounds
-    int minX = monitors[0].left;
-    int minY = monitors[0].top;
-    int maxX = monitors[0].left + monitors[0].width;
-    int maxY = monitors[0].top + monitors[0].height;
+    constexpr int MAX_DIMENSION = 32768;
+    int64_t minX = (std::numeric_limits<int64_t>::max)();
+    int64_t minY = minX;
+    int64_t maxX = (std::numeric_limits<int64_t>::min)();
+    int64_t maxY = maxX;
     
-    for (const auto& monitor : monitors)
+    // Validate every source before allocating or copying. A moved-from or
+    // truncated screenshot still has dimensions, but no longer has those pixels.
+    for (const auto* source : monitors)
     {
-        minX = std::min(minX, monitor.left);
-        minY = std::min(minY, monitor.top);
-        maxX = std::max(maxX, monitor.left + monitor.width);
-        maxY = std::max(maxY, monitor.top + monitor.height);
+        if (!source || source->width <= 0 || source->height <= 0 ||
+            source->width > MAX_DIMENSION || source->height > MAX_DIMENSION)
+        {
+            return Result<CombinedScreenshot>::Error(
+                ErrorInfo::FromMessage(E_INVALIDARG, "Invalid source dimensions", "CombineMonitors"));
+        }
+    
+        const auto& monitor = *source;
+        const size_t sourceSize = size_t(monitor.width) * size_t(monitor.height) * 4;
+        if (monitor.pixelData.size() < sourceSize)
+        {
+            return Result<CombinedScreenshot>::Error(
+                ErrorInfo::FromMessage(E_INVALIDARG, "Source pixel buffer is too small", "CombineMonitors"));
+        }
+    
+        minX = (std::min)(minX, int64_t(monitor.left));
+        minY = (std::min)(minY, int64_t(monitor.top));
+        maxX = (std::max)(maxX, int64_t(monitor.left) + monitor.width);
+        maxY = (std::max)(maxY, int64_t(monitor.top) + monitor.height);
     }
-    
-    int finalWidth = maxX - minX;
-    int finalHeight = maxY - minY;
-    
-    // Sanity checks to prevent integer overflow and excessive memory allocation
-    const int MAX_DIMENSION = 32768;  // Reasonable maximum for screen dimensions
-    if (finalWidth <= 0 || finalHeight <= 0 ||
-        finalWidth > MAX_DIMENSION || finalHeight > MAX_DIMENSION)
+
+    const int64_t unionWidth = maxX - minX;
+    const int64_t unionHeight = maxY - minY;
+    if (unionWidth <= 0 || unionHeight <= 0 ||
+        unionWidth > MAX_DIMENSION || unionHeight > MAX_DIMENSION)
     {
         return Result<CombinedScreenshot>::Error(
             ErrorInfo::FromMessage(E_FAIL, "Combined screenshot dimensions are invalid or too large", "CombineMonitors"));
     }
     
+    const int finalWidth = static_cast<int>(unionWidth);
+    const int finalHeight = static_cast<int>(unionHeight);
+
     // Check for potential integer overflow in buffer size calculation
     size_t bufferSize = static_cast<size_t>(finalWidth) * static_cast<size_t>(finalHeight) * 4;
-    const size_t MAX_BUFFER_SIZE = 4294967296;  // 4GB limit
+    const size_t MAX_BUFFER_SIZE = (std::numeric_limits<UINT>::max)();
     if (bufferSize > MAX_BUFFER_SIZE)
     {
         return Result<CombinedScreenshot>::Error(
@@ -230,37 +276,30 @@ Result<CombinedScreenshot> WindowsScreenshotCapture::CombineMonitors(const std::
     std::vector<uint8_t> finalBuffer(bufferSize, 0);
     
     // Copy each monitor's pixels to correct position
-    for (const auto& monitor : monitors)
+    for (const auto* source : monitors)
     {
-        int offsetX = monitor.left - minX;
-        int offsetY = monitor.top - minY;
-        
-        // Bounds check to prevent buffer overflow
-        if (offsetX < 0 || offsetY < 0 || 
-            offsetX + monitor.width > finalWidth || 
-            offsetY + monitor.height > finalHeight)
-        {
-            return Result<CombinedScreenshot>::Error(
-                ErrorInfo::FromMessage(E_FAIL, "Monitor bounds exceed combined buffer", "CombineMonitors"));
-        }
+        const auto& monitor = *source;
+        const size_t offsetX = static_cast<size_t>(int64_t(monitor.left) - minX);
+        const size_t offsetY = static_cast<size_t>(int64_t(monitor.top) - minY);
+        const size_t rowBytes = size_t(monitor.width) * 4;
         
         for (int y = 0; y < monitor.height; y++)
         {
-            int srcRowStart = y * monitor.width * 4;
-            int dstRowStart = ((offsetY + y) * finalWidth + offsetX) * 4;
+            const size_t srcRowStart = size_t(y) * rowBytes;
+            const size_t dstRowStart = ((offsetY + size_t(y)) * size_t(finalWidth) + offsetX) * 4;
             
             std::memcpy(
                 finalBuffer.data() + dstRowStart,
                 monitor.pixelData.data() + srcRowStart,
-                monitor.width * 4);
+                rowBytes);
         }
     }
     
     CombinedScreenshot combined;
     combined.width = finalWidth;
     combined.height = finalHeight;
-    combined.left = minX;
-    combined.top = minY;
+    combined.left = static_cast<int>(minX);
+    combined.top = static_cast<int>(minY);
     combined.pixelData = std::move(finalBuffer);
     
     return Result<CombinedScreenshot>::Ok(std::move(combined));
@@ -274,19 +313,26 @@ Result<void> WindowsScreenshotCapture::SaveToPng(const uint8_t* pixelData, int w
             ErrorInfo::FromMessage(E_INVALIDARG, "Invalid parameters", "SaveToPng"));
     }
     
+    // WIC takes UINT byte counts. Validate in 64 bits before narrowing.
+    const uint64_t stride64 = uint64_t(width) * 4;
+    const uint64_t bufferSize64 = stride64 * uint64_t(height);
+    if (bufferSize64 > (std::numeric_limits<UINT>::max)())
+    {
+        return Result<void>::Error(
+            ErrorInfo::FromMessage(E_INVALIDARG, "PNG pixel buffer is too large", "SaveToPng"));
+    }
+
     // RAII wrapper for COM initialization
     struct ComInitializer
     {
-        bool initialized;
-        ComInitializer() : initialized(false)
+        HRESULT result;
+        ComInitializer() : result(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))
         {
-            HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-            // Track if we successfully initialized COM (S_OK or S_FALSE means already initialized)
-            initialized = SUCCEEDED(hr) && (hr != S_FALSE);
         }
         ~ComInitializer()
         {
-            if (initialized)
+            // S_FALSE increments the COM initialization count too.
+            if (SUCCEEDED(result))
             {
                 CoUninitialize();
             }
@@ -294,6 +340,10 @@ Result<void> WindowsScreenshotCapture::SaveToPng(const uint8_t* pixelData, int w
     };
     
     ComInitializer comInit;
+    if (FAILED(comInit.result) && comInit.result != RPC_E_CHANGED_MODE)
+    {
+        return Result<void>::Error(ErrorInfo::FromHResult(comInit.result, "CoInitializeEx"));
+    }
     
     // Create WIC factory
     wil::com_ptr<IWICImagingFactory> pFactory;
@@ -360,8 +410,8 @@ Result<void> WindowsScreenshotCapture::SaveToPng(const uint8_t* pixelData, int w
     }
     
     // Write pixels
-    UINT stride = width * 4;
-    UINT bufferSize = stride * height;
+    const UINT stride = static_cast<UINT>(stride64);
+    const UINT bufferSize = static_cast<UINT>(bufferSize64);
     hr = pFrame->WritePixels(height, stride, bufferSize, const_cast<BYTE*>(pixelData));
     if (FAILED(hr))
     {

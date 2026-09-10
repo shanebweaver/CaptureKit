@@ -54,6 +54,12 @@
     <ClCompile Include="ResultTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ScreenshotSafetyTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\CaptureKit.Windows.Native.Recording\ScreenshotExports.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="ShutdownRaceConditionTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

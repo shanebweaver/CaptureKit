@@ -1,4 +1,5 @@
 #pragma once
+#include <span>
 #include "IScreenshotCapture.h"
 #include <Windows.h>
 #include <wil/com.h>
@@ -214,6 +215,7 @@ public:
     Result<MonitorScreenshot> CaptureMonitor(HMONITOR hMonitor) override;
     Result<std::vector<MonitorScreenshot>> CaptureAllMonitors() override;
     Result<CombinedScreenshot> CombineMonitors(const std::vector<MonitorScreenshot>& monitors) override;
+    Result<CombinedScreenshot> CombineMonitorViews(std::span<const MonitorScreenshot* const> monitors);
     Result<void> SaveToPng(const uint8_t* pixelData, int width, int height, const wchar_t* filePath) override;
     
 private:
@@ -225,7 +227,7 @@ private:
     /// <summary>
     /// Callback function for EnumDisplayMonitors.
     /// </summary>
-    static BOOL CALLBACK EnumMonitorCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM lParam);
+    static BOOL CALLBACK EnumMonitorCallback(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM lParam) noexcept;
     
     /// <summary>
     /// Context data passed to EnumMonitorCallback.
@@ -235,5 +237,6 @@ private:
         WindowsScreenshotCapture* pThis;
         std::vector<MonitorScreenshot>* pResults;
         ErrorInfo* pError;
+        HRESULT exceptionHr = S_OK;
     };
 };

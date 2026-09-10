@@ -60,6 +60,45 @@ public sealed class DisplayCaptureServiceTests
             .WithParameterName("displays");
     }
 
+    [TestMethod]
+    [DataRow(3)]
+    [DataRow(8)]
+    public void CreateBitmap_WithMismatchedPixelBuffer_RejectsBeforeNativeCopy(int bufferLength)
+    {
+        var service = new DisplayCaptureService();
+        DisplayCapture display = CreateDisplay(new Rectangle(0, 0, 1, 1), 0, 0, 0)
+            with { PixelBuffer = new byte[bufferLength] };
+
+        Action act = () => service.CreateBitmap(display);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("pixelBuffer");
+    }
+
+    [TestMethod]
+    public void CreateBitmap_WithHugeDimensions_RejectsBeforeAllocation()
+    {
+        var service = new DisplayCaptureService();
+        DisplayCapture display = CreateDisplay(new Rectangle(0, 0, 1, 1), 0, 0, 0)
+            with { Bounds = new Rectangle(0, 0, int.MaxValue, int.MaxValue) };
+
+        Action act = () => service.CreateBitmap(display);
+
+        act.Should().Throw<ArgumentException>().WithParameterName("pixelBuffer");
+    }
+
+    [TestMethod]
+    public void CreateBitmap_WithMultipleRows_PreservesPixelOrder()
+    {
+        var service = new DisplayCaptureService();
+        DisplayCapture display = CreateDisplay(new Rectangle(0, 0, 1, 2), 0, 0, 0)
+            with { PixelBuffer = [0, 0, 255, 255, 255, 0, 0, 255] };
+
+        using Bitmap bitmap = service.CreateBitmap(display);
+
+        bitmap.GetPixel(0, 0).Should().Be(Color.FromArgb(255, 255, 0, 0));
+        bitmap.GetPixel(0, 1).Should().Be(Color.FromArgb(255, 0, 0, 255));
+    }
+
     private static DisplayCapture CreateDisplay(Rectangle bounds, byte red, byte green, byte blue)
     {
         var pixelBuffer = new byte[bounds.Width * bounds.Height * 4];

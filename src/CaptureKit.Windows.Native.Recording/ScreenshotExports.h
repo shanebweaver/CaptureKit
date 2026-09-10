@@ -12,14 +12,14 @@ extern "C"
     /// </summary>
     /// <param name="hMonitor">Handle to the monitor to capture.</param>
     /// <returns>Handle to screenshot data, or nullptr on failure. Caller must free with FreeScreenshot.</returns>
-    __declspec(dllexport) ScreenshotHandle* CaptureMonitorScreenshot(HMONITOR hMonitor);
+    __declspec(dllexport) ScreenshotHandle* CaptureMonitorScreenshot(HMONITOR hMonitor) noexcept;
     
     /// <summary>
     /// Capture screenshots from all available monitors.
     /// Returns a handle representing all monitors combined.
     /// </summary>
     /// <returns>Handle to combined screenshot data, or nullptr on failure. Caller must free with FreeScreenshot.</returns>
-    __declspec(dllexport) ScreenshotHandle* CaptureAllMonitorsScreenshot();
+    __declspec(dllexport) ScreenshotHandle* CaptureAllMonitorsScreenshot() noexcept;
     
     /// <summary>
     /// Get information about a captured screenshot.
@@ -40,7 +40,7 @@ extern "C"
         int* top,
         uint32_t* dpiX,
         uint32_t* dpiY,
-        bool* isPrimary);
+        bool* isPrimary) noexcept;
     
     /// <summary>
     /// Copy screenshot pixel data to a managed buffer.
@@ -52,7 +52,7 @@ extern "C"
     __declspec(dllexport) bool CopyScreenshotPixels(
         ScreenshotHandle* handle,
         uint8_t* buffer,
-        int bufferSize);
+        int bufferSize) noexcept;
     
     /// <summary>
     /// Save screenshot to PNG file.
@@ -62,21 +62,22 @@ extern "C"
     /// <returns>True if save succeeded, false otherwise.</returns>
     __declspec(dllexport) bool SaveScreenshotToPng(
         ScreenshotHandle* handle,
-        const wchar_t* filePath);
+        const wchar_t* filePath) noexcept;
     
     /// <summary>
     /// Free screenshot handle and associated memory.
     /// </summary>
     /// <param name="handle">Screenshot handle to free.</param>
-    __declspec(dllexport) void FreeScreenshot(ScreenshotHandle* handle);
+    __declspec(dllexport) void FreeScreenshot(ScreenshotHandle* handle) noexcept;
     
     /// <summary>
     /// Combine multiple screenshot handles into a single combined screenshot.
+    /// Input handles retain their pixels and must remain alive for this call.
     /// </summary>
     /// <param name="handles">Array of screenshot handles to combine.</param>
     /// <param name="count">Number of handles in the array.</param>
     /// <returns>Handle to combined screenshot, or nullptr on failure. Caller must free with FreeScreenshot.</returns>
     __declspec(dllexport) ScreenshotHandle* CombineScreenshots(
         ScreenshotHandle** handles,
-        int count);
+        int count) noexcept;
 }
